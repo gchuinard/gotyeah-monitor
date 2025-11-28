@@ -1,0 +1,50 @@
+# --- GLOBAL ---
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env files
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# --- NODE / SVELTE (front) ---
+
+front/node_modules/
+front/.svelte-kit/
+front/dist/
+front/.vite/
+
+
+# --- PYTHON (API + WORKER) ---
+
+# Virtual environments
+api/.venv/
+worker/.venv/
+
+# Python stuff
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+instance/
+.pytest_cache/
+
+# --- DOCKER ---
+/data/
+docker/*.log
+
+
+# --- EDITORS ---
+.vscode/
+.idea/
+*.swp
