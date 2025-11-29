@@ -7,24 +7,25 @@ services:
       dockerfile: Dockerfile.prod
     container_name: monitor_api_prod
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     networks:
       - monitor_net
+    expose:
+      - "8000"
 
   front:
     build:
       context: ./front
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_URL: "http://192.168.1.99:8000"
+        VITE_API_URL: "https://api.monitor.gautierchuinard.com"
     container_name: monitor_front_prod
     restart: unless-stopped
-    ports:
-      - "3000:80"
     networks:
       - monitor_net
+    expose:
+      - "80"
 
 networks:
   monitor_net:
-    driver: bridge
+    name: monitor_net
+    external: true
