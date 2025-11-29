@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  api:
+    build: ./api
+    container_name: monitor_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    networks:
+      - monitor_net
+
+  front:
+    build: ./front
+    container_name: monitor_front
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - monitor_net
+
+networks:
+  monitor_net:
+    driver: bridge
