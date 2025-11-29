@@ -5,14 +5,13 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 
-# Build Svelte en mode PROD (charge .env.production)
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
-# ---- IMAGE FINALE ----
 FROM nginx:stable-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose port HTTP
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
