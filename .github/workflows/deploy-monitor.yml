@@ -1,0 +1,22 @@
+name: Deploy GotYeah Monitor
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull latest code
+        run: git pull
+
+      - name: Restart Docker stack
+        run: |
+          cd /home/pi/sites/gotyeah-monitor
+          docker-compose -f docker-compose.prod.yml down
+          docker-compose -f docker-compose.prod.yml up -d --build
