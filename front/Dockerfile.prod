@@ -10,7 +10,7 @@ RUN npm run build
 
 # ---- IMAGE FINALE ----
 FROM nginx:stable-alpine
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Expose port HTTP
 EXPOSE 80
