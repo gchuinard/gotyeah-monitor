@@ -5,13 +5,17 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # Autoriser toutes les origines (DEV)
+    allow_origins=["*"],        # Autoriser toutes les origines (DEV/PROD ok)
     allow_credentials=True,
-    allow_methods=["*"],        # Autoriser tous les verbes HTTP
-    allow_headers=["*"],        # Autoriser tous les headers
-    expose_headers=["*"],       # Expose tous les headers
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.head("/health")
+def health_head():
+    return
