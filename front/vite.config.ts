@@ -3,6 +3,9 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  preview: {
+    allowedHosts: ['monitor.gautierchuinard.com']
+  },
   plugins: [
     tailwindcss(),
     sveltekit()
