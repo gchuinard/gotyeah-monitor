@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Installer les dépendances
+COPY package*.json ./
+RUN npm install --production=false
+
+# Copier le code
+COPY . .
+
+# Build SvelteKit
+RUN npm run build
+
+EXPOSE 80
+
+# Lancer le serveur de prévisualisation en prod
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "80"]

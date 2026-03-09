@@ -9,14 +9,9 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Pull latest code
-        run: git pull
-
-      - name: Restart Docker stack
+      - name: Mettre à jour le code et redémarrer le stack
         run: |
           cd /home/pi/sites/gotyeah-monitor
+          git pull
           docker-compose -f docker-compose.prod.yml down
           docker-compose -f docker-compose.prod.yml up -d --build
