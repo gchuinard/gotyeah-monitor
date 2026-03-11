@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import hashlib
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -13,7 +14,7 @@ import models
 import schemas
 
 
-SECRET_KEY = "CHANGE_ME_SECRET"  # à mettre dans les variables d'env en prod
+SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
