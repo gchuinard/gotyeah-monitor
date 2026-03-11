@@ -1,12 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 
+	export let id: number;
 	export let name: string;
+	export let url: string;
 	export let status: 'up' | 'down' | 'checking';
 	export let type: string = 'Service';
 	export let latency: number | null = null;
 	export let history: number[] = [];
+	export let lastCheckedAt: string | null = null;
+	export let createdAt: string;
+	export let expectedStatusCode: number;
+	export let lastStatusCode: number | null;
 
 	let showDetails = false;
 	let mode = 1;
@@ -37,6 +44,28 @@
 		checking: '⏳'
 	};
 
+	function formatRelative(dateStr: string | null): string {
+		if (!dateStr) return 'Jamais vérifié';
+		const d = new Date(dateStr);
+		if (Number.isNaN(d.getTime())) return 'Inconnu';
+
+		const diffMs = Date.now() - d.getTime();
+		const diffSec = Math.round(diffMs / 1000);
+		if (diffSec < 60) return `il y a ${diffSec}s`;
+		const diffMin = Math.round(diffSec / 60);
+		if (diffMin < 60) return `il y a ${diffMin} min`;
+		const diffH = Math.round(diffMin / 60);
+		if (diffH < 24) return `il y a ${diffH} h`;
+		const diffD = Math.round(diffH / 24);
+		return `il y a ${diffD} j`;
+	}
+
+	function formatDate(dateStr: string): string {
+		const d = new Date(dateStr);
+		if (Number.isNaN(d.getTime())) return 'Inconnu';
+		return d.toLocaleString();
+	}
+
 	function latencyColor(lat: number | null) {
 		if (lat === null) return 'text-gray-400';
 		if (lat < 150) return 'text-gotyeah-400';
@@ -50,20 +79,20 @@
 
 <!-- CARD -->
 <div
-	class={`p-5 rounded-xl border 
-    backdrop-blur-md bg-white/5 
-    shadow-[0_0_20px_rgba(0,0,0,0.25)]
-    hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(41,117,255,0.4)]
+	class={`p-5 rounded-3xl border 
+    bg-white/80 backdrop-blur-2xl 
+    shadow-[0_0_35px_rgba(56,189,248,0.28)]
+    hover:shadow-[0_0_55px_rgba(56,189,248,0.45)] hover:-translate-y-0.5 hover:scale-[1.01]
     transition-all duration-300
     ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}
     ${animationClass}
     flex flex-col gap-3
     ${
 			status === 'up'
-				? 'border-gotyeah-500/40'
+				? 'border-cyan-400/70'
 				: status === 'down'
-					? 'border-red-500/40'
-					: 'border-gotyeah-300/40'
+					? 'border-rose-400/70'
+					: 'border-sky-300/70'
 		}`}
 >
 	<!-- HEADER -->
@@ -88,25 +117,61 @@
 	</div>
 
 	<!-- LATENCY -->
-	<div class="flex items-center text-sm">
-		<span class="text-gray-400">Latence :</span>
-		<span class={`ml-2 font-medium ${latencyColor(latency)}`}>
-			{latency !== null ? `${latency} ms` : 'N/A'}
-		</span>
+	<div class="flex flex-col gap-0.5 text-sm">
+		<div class="flex items-center">
+			<span class="text-gray-400">Latence :</span>
+			<span class={`ml-2 font-medium ${latencyColor(latency)}`}>
+				{latency !== null ? `${latency} ms` : 'N/A'}
+			</span>
+		</div>
+		<div class="text-xs text-gray-400">
+			Code HTTP reçu :
+			<span class={lastStatusCode === expectedStatusCode ? 'text-gotyeah-300' : 'text-red-400'}>
+				{lastStatusCode ?? 'N/A'}
+			</span>
+			<span class="text-gray-500"> (attendu {expectedStatusCode})</span>
+		</div>
+	</div>
+
+	<!-- URL + métadonnées -->
+	<div class="flex flex-col gap-1 text-xs text-slate-500">
+		<a
+			href={url}
+			target="_blank"
+			rel="noreferrer"
+			class="truncate text-cyan-600 hover:text-cyan-500 hover:underline"
+			title={url}
+		>
+			{url}
+		</a>
+		<div class="flex flex-wrap gap-x-4 gap-y-1">
+			<span>Dernier check : {formatRelative(lastCheckedAt)}</span>
+			<span>Créé le : {formatDate(createdAt)}</span>
+		</div>
 	</div>
 
 	<!-- DETAILS SECTION -->
 	<div class="mt-2 border-t border-white/10 pt-3">
-		<button
-			class="text-gray-400 hover:text-white transition flex items-center gap-1 text-sm"
-			on:click={() => (showDetails = !showDetails)}
-		>
-			{#if showDetails}
-				🙈 <span>Cacher détails</span>
-			{:else}
-				👁️ <span>Voir détails</span>
-			{/if}
-		</button>
+		<div class="flex items-center justify-between gap-3">
+			<button
+				class="text-gray-400 hover:text-white transition flex items-center gap-1 text-sm"
+				on:click={() => (showDetails = !showDetails)}
+			>
+				{#if showDetails}
+					🙈 <span>Cacher détails</span>
+				{:else}
+					👁️ <span>Voir détails</span>
+				{/if}
+			</button>
+
+			<button
+				class="text-xs px-2 py-1 rounded bg-white/5 border border-white/15 hover:bg-white/10 text-gray-200"
+				type="button"
+				on:click={() => goto(`/edit/${id}`)}
+			>
+				Modifier
+			</button>
+		</div>
 
 		{#if showDetails}
 			<div class="mt-3 flex flex-col gap-4">

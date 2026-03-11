@@ -7,6 +7,14 @@ services:
       dockerfile: Dockerfile.prod
     container_name: monitor_api_prod
     restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=gotyeah
+      - DB_PASSWORD=gotyeah_pwd
+      - DB_NAME=gotyeah_monitor
+    depends_on:
+      - db
     networks:
       - monitor_net
     expose:
@@ -24,6 +32,25 @@ services:
       - monitor_net
     expose:
       - "80"
+
+  db:
+    image: mysql:8
+    container_name: monitor_db_prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pwd
+      MYSQL_DATABASE: gotyeah_monitor
+      MYSQL_USER: gotyeah
+      MYSQL_PASSWORD: gotyeah_pwd
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - monitor_net
+    expose:
+      - "3306"
+
+volumes:
+  db_data:
 
 networks:
   monitor_net:
