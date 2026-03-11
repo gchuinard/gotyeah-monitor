@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+@layer base {
+  /* Force le thème sur la base de html.dark, pas sur Windows */
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
+  /* Désactive les \"couleurs forcées\" de Windows sur le contenu principal */
+  .forced-color-adjust-none {
+    forced-color-adjust: none;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-full font-medium
+      transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  }
+
+  .btn-sm {
+    @apply text-xs px-3 py-1.5;
+  }
+
+  .btn-md {
+    @apply text-sm px-4 py-2;
+  }
+
+  .btn-primary {
+    @apply bg-cyan-500 hover:bg-cyan-400 text-white border border-cyan-300
+      shadow-[0_0_20px_rgba(34,211,238,0.55)];
+  }
+
+  .btn-secondary {
+    @apply bg-white/70 hover:bg-white text-slate-700 border border-slate-200 shadow-sm;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-white/10 border border-white/20 text-slate-200;
+  }
+
+  .btn-danger {
+    @apply bg-rose-500/90 hover:bg-rose-500 text-white border border-rose-300
+      shadow-[0_0_18px_rgba(244,63,94,0.6)];
+  }
+
+  .btn-muted {
+    @apply bg-white/60 hover:bg-white text-slate-600 border border-slate-200 shadow-sm;
+  }
+}
+

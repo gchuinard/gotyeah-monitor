@@ -44,35 +44,38 @@
 
 <div class="min-h-screen flex items-start justify-center pt-10 pb-12">
   <div
-    class="w-full max-w-3xl mx-auto p-8
-           rounded-3xl bg-white/85 backdrop-blur-2xl
-           border border-white/70 shadow-[0_0_60px_rgba(56,189,248,0.3)]"
+    class="w-full max-w-xl mx-auto
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
+           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           overflow-hidden"
   >
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80 dark:border-slate-800">
       <div class="flex flex-col gap-1">
-        <div class="text-xs uppercase tracking-[0.25em] text-slate-400">
+        <div class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
           GotYeah Monitor
         </div>
-        <h1 class="text-2xl font-semibold text-slate-900">Ajouter un monitor</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Ajouter un monitor</h1>
       </div>
       <button
         type="button"
-        class="text-sm px-3 py-1.5 rounded-full border border-slate-200
-               bg-white/60 text-slate-600 hover:bg-white transition"
+        class="btn btn-sm btn-secondary"
         on:click={() => goto("/")}
       >
         Retour
       </button>
     </div>
 
-    <form
-      class="p-5 rounded-2xl border border-slate-200/70 bg-white/80 flex flex-col gap-4"
-      on:submit|preventDefault={onSubmit}
-    >
+    <div class="px-4 pb-6 pt-4">
+      <form
+        class="rounded-3xl border bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl 
+               shadow-[0_0_35px_rgba(56,189,248,0.28)] dark:shadow-[0_0_45px_rgba(56,189,248,0.4)]
+               flex flex-col gap-4 p-6"
+        on:submit|preventDefault={onSubmit}
+      >
     <label class="flex flex-col gap-1">
-      <span class="text-sm text-slate-600">Nom</span>
+      <span class="text-sm text-slate-600 dark:text-slate-200">Nom</span>
       <input
-        class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+        class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
         bind:value={name}
         placeholder="Ex: Backend API"
         required
@@ -80,20 +83,20 @@
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-sm text-slate-600">URL</span>
+      <span class="text-sm text-slate-600 dark:text-slate-200">URL</span>
       <input
-        class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+        class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
         bind:value={url}
         placeholder="https://example.com/health"
         required
       />
-      <span class="text-xs text-slate-400">Doit être une URL valide (http/https).</span>
+      <span class="text-xs text-slate-400 dark:text-slate-500">Doit être une URL valide (http/https).</span>
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-sm text-slate-600">Type</span>
+      <span class="text-sm text-slate-600 dark:text-slate-200">Type</span>
       <select
-        class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+        class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
         bind:value={type}
       >
         <option value="http">HTTP</option>
@@ -103,34 +106,32 @@
     </label>
 
     <label class="flex flex-col gap-1">
-      <span class="text-sm text-slate-600">Code HTTP attendu</span>
+      <span class="text-sm text-slate-600 dark:text-slate-200">Code HTTP attendu</span>
       <input
         type="number"
         min="100"
         max="599"
-        class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+        class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
         bind:value={expectedStatusCode}
       />
-      <span class="text-xs text-slate-400">Par défaut 200 (OK).</span>
+      <span class="text-xs text-slate-400 dark:text-slate-500">Par défaut 200 (OK).</span>
     </label>
 
     {#if error}
-      <div class="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+      <div class="text-sm text-rose-600 bg-rose-50/90 dark:bg-rose-900/30 border border-rose-200/80 dark:border-rose-500/40 rounded-xl px-3 py-2">
         {error}
       </div>
     {/if}
 
-      <button
-        type="submit"
-        class="mt-2 px-4 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400
-               disabled:opacity-50 disabled:cursor-not-allowed
-               text-sm font-medium text-white transition
-               shadow-[0_0_25px_rgba(34,211,238,0.65)] border border-cyan-300"
-        disabled={submitting}
-      >
-        {submitting ? "Ajout..." : "Ajouter"}
-      </button>
-    </form>
+        <button
+          type="submit"
+          class="btn btn-md btn-primary mt-2 self-end disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={submitting}
+        >
+          {submitting ? "Ajout..." : "Ajouter"}
+        </button>
+      </form>
+    </div>
   </div>
 </div>
 

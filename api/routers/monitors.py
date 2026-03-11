@@ -66,10 +66,18 @@ async def update_monitor(
     monitor_id: int,
     payload: schemas.MonitorUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ) -> schemas.MonitorRead:
     monitor = await db.get(models.Monitor, monitor_id)
     if not monitor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    # Si le monitor est ancien et n'a pas encore d'utilisateur associé,
+    # on l'associe au user courant. Sinon on vérifie l'appartenance.
+    if monitor.user_id is None:
+        monitor.user_id = current_user.id
+    elif monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     monitor.name = payload.name
     monitor.url = str(payload.url)
@@ -79,3 +87,25 @@ async def update_monitor(
     await db.commit()
     await db.refresh(monitor)
     return monitor
+
+
+@router.delete("/{monitor_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_monitor(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> None:
+    monitor = await db.get(models.Monitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    # Même logique que pour update : on permet de "récupérer" les vieux monitors
+    # qui n'avaient pas encore de user_id.
+    if monitor.user_id is None:
+        monitor.user_id = current_user.id
+    elif monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    await db.delete(monitor)
+    await db.commit()
+    return None

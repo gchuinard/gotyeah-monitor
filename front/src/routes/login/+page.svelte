@@ -32,8 +32,15 @@
       const data = await res.json();
       const token = data.access_token as string;
 
-      // Optionnel : récupérer le profil minimal en appelant /me plus tard.
-      setAuth(token, { id: 0, email });
+      const meRes = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!meRes.ok) {
+        throw new Error("Impossible de récupérer le profil utilisateur");
+      }
+      const me = await meRes.json();
+
+      setAuth(token, { id: me.id as number, email: me.email as string });
 
       await goto("/");
     } catch (e) {
@@ -94,10 +101,7 @@
 
       <button
         type="submit"
-        class="mt-2 px-4 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400
-               disabled:opacity-50 disabled:cursor-not-allowed
-               text-sm font-medium text-white transition
-               shadow-[0_0_25px_rgba(34,211,238,0.65)] border border-cyan-300"
+        class="btn btn-md btn-primary mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={submitting}
       >
         {submitting ? "Connexion..." : "Se connecter"}

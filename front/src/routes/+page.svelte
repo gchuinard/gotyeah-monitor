@@ -1,6 +1,6 @@
 <script lang="ts">
   import { monitors, type MonitorCardData } from "$lib/stores/monitors";
-  import { auth, type AuthState } from "$lib/stores/auth";
+  import { auth, clearAuth, type AuthState } from "$lib/stores/auth";
   import MonitorCard from "$lib/components/MonitorCard.svelte";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -23,8 +23,14 @@
   let loading = false;
   let error: string | null = null;
   let authState: AuthState;
+  let viewMode: "grid" | "list" = "grid";
 
   $: auth.subscribe((v) => (authState = v));
+
+  function logout() {
+    clearAuth();
+    goto("/login");
+  }
 
   async function fetchMonitors() {
     loading = true;
@@ -95,23 +101,35 @@
 <div class="min-h-screen flex items-start justify-center pt-10 pb-12">
   <div
     class="w-full max-w-6xl mx-auto
-           rounded-3xl bg-white/80 backdrop-blur-2xl
-           border border-white/70 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
+           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
            overflow-hidden"
   >
-    <div class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80">
+    <div class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80 dark:border-slate-800">
       <div class="flex flex-col gap-1">
-        <div class="text-xs uppercase tracking-[0.25em] text-slate-400">
+        <div class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
           GotYeah Monitor
         </div>
-        <div class="text-2xl font-semibold text-slate-900">Moniteurs</div>
+        <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Moniteurs</div>
       </div>
       <div class="flex items-center gap-3">
+        <div class="relative">
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary flex items-center gap-2"
+            on:click={() => goto("/profile")}
+          >
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 text-white text-xs">
+              {authState?.user?.email?.[0]?.toUpperCase() ?? "?"}
+            </span>
+            <span class="max-w-[140px] truncate">
+              {authState?.user?.email ?? "Profil"}
+            </span>
+          </button>
+        </div>
         <button
           type="button"
-          class="px-4 py-2 rounded-full bg-white/60 hover:bg-white
-                 text-sm font-medium text-slate-700 transition
-                 border border-slate-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn btn-sm btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           on:click={fetchMonitors}
           disabled={loading}
         >
@@ -119,12 +137,28 @@
         </button>
         <button
           type="button"
-          class="px-4 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400
-                 text-sm font-medium text-white transition
-                 shadow-[0_0_25px_rgba(34,211,238,0.65)] border border-cyan-300"
+          class={`btn btn-sm ${
+            viewMode === "grid"
+              ? "btn-ghost"
+              : "btn-secondary bg-slate-800 text-slate-100 border-slate-600"
+          }`}
+          on:click={() => (viewMode = viewMode === "grid" ? "list" : "grid")}
+        >
+          {viewMode === "grid" ? "Vue liste" : "Vue grille"}
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
           on:click={() => goto("/add")}
         >
           Ajouter
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-secondary"
+          on:click={logout}
+        >
+          Déconnexion
         </button>
       </div>
     </div>
@@ -133,9 +167,13 @@
       <div class="px-8 pt-3 pb-2 text-sm text-rose-500">{error}</div>
     {/if}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8">
-      {#each $monitors as m}
-        <MonitorCard {...m} />
+    <div
+      class={viewMode === "grid"
+        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8"
+        : "flex flex-col gap-4 p-8"}
+    >
+      {#each $monitors as m (m.id)}
+        <MonitorCard {...m} onDeleted={fetchMonitors} compact={viewMode === "list"} />
       {/each}
     </div>
   </div>

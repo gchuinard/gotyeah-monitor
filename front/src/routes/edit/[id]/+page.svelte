@@ -20,7 +20,15 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(`${API_URL}/monitors/${id}`);
+      const stored =
+        typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
+      const token = stored ? (JSON.parse(stored).token as string | null) : null;
+
+      const res = await fetch(`${API_URL}/monitors/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         throw new Error(text || `HTTP ${res.status}`);
@@ -43,9 +51,16 @@
     submitting = true;
     error = null;
     try {
+      const stored =
+        typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
+      const token = stored ? (JSON.parse(stored).token as string | null) : null;
+
       const res = await fetch(`${API_URL}/monitors/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           name,
           url,
@@ -68,81 +83,97 @@
   }
 </script>
 
-<div class="max-w-xl mx-auto p-6">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-xl font-semibold">Modifier le monitor</h1>
-    <button
-      type="button"
-      class="text-sm text-gray-300 hover:text-white transition"
-      on:click={() => goto("/")}
-    >
-      Retour
-    </button>
-  </div>
-
-  {#if loading}
-    <div class="text-sm text-gray-300">Chargement...</div>
-  {:else}
-    <form
-      class="p-5 rounded-xl border border-white/10 backdrop-blur-md bg-white/5 shadow-[0_0_20px_rgba(0,0,0,0.25)] flex flex-col gap-4"
-      on:submit|preventDefault={onSubmit}
-    >
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-gray-300">Nom</span>
-        <input
-          class="px-3 py-2 rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:ring-2 focus:ring-gotyeah-500/60"
-          bind:value={name}
-          required
-        />
-      </label>
-
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-gray-300">URL</span>
-        <input
-          class="px-3 py-2 rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:ring-2 focus:ring-gotyeah-500/60"
-          bind:value={url}
-          required
-        />
-        <span class="text-xs text-gray-500">Doit être une URL valide (http/https).</span>
-      </label>
-
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-gray-300">Type</span>
-        <select
-          class="px-3 py-2 rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:ring-2 focus:ring-gotyeah-500/60"
-          bind:value={type}
-        >
-          <option value="http">HTTP</option>
-          <option value="ping">Ping</option>
-          <option value="port">Port</option>
-        </select>
-      </label>
-
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-gray-300">Code HTTP attendu</span>
-        <input
-          type="number"
-          min="100"
-          max="599"
-          class="px-3 py-2 rounded-lg bg-black/30 border border-white/10 focus:outline-none focus:ring-2 focus:ring-gotyeah-500/60"
-          bind:value={expectedStatusCode}
-        />
-      </label>
-
-      {#if error}
-        <div class="text-sm text-red-300 bg-red-900/20 border border-red-500/30 rounded-lg px-3 py-2">
-          {error}
+<div class="min-h-screen flex items-start justify-center pt-10 pb-12">
+  <div
+    class="w-full max-w-xl mx-auto
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
+           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           overflow-hidden"
+  >
+    <div class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+      <div class="flex flex-col gap-1">
+        <div class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
+          GotYeah Monitor
         </div>
-      {/if}
-
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Modifier le monitor</h1>
+      </div>
       <button
-        type="submit"
-        class="mt-2 px-3 py-2 rounded-lg bg-gotyeah-500/90 hover:bg-gotyeah-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition border border-gotyeah-400/40"
-        disabled={submitting}
+        type="button"
+        class="btn btn-sm btn-secondary"
+        on:click={() => goto("/")}
       >
-        {submitting ? "Enregistrement..." : "Enregistrer"}
+        Retour
       </button>
-    </form>
-  {/if}
+    </div>
+
+    <div class="px-4 pb-6 pt-4">
+      {#if loading}
+        <div class="text-sm text-slate-500 dark:text-slate-300">Chargement...</div>
+      {:else}
+        <form
+          class="rounded-3xl border bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl 
+                 shadow-[0_0_35px_rgba(56,189,248,0.28)] dark:shadow-[0_0_45px_rgba(56,189,248,0.4)]
+                 flex flex-col gap-4 p-6"
+          on:submit|preventDefault={onSubmit}
+        >
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-600 dark:text-slate-200">Nom</span>
+            <input
+              class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+              bind:value={name}
+              required
+            />
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-600 dark:text-slate-200">URL</span>
+            <input
+              class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+              bind:value={url}
+              required
+            />
+            <span class="text-xs text-slate-400 dark:text-slate-500">Doit être une URL valide (http/https).</span>
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-600 dark:text-slate-200">Type</span>
+            <select
+              class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+              bind:value={type}
+            >
+              <option value="http">HTTP</option>
+              <option value="ping">Ping</option>
+              <option value="port">Port</option>
+            </select>
+          </label>
+
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-600 dark:text-slate-200">Code HTTP attendu</span>
+            <input
+              type="number"
+              min="100"
+              max="599"
+              class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+              bind:value={expectedStatusCode}
+            />
+          </label>
+
+          {#if error}
+            <div class="text-sm text-rose-600 bg-rose-50/90 dark:bg-rose-900/30 border border-rose-200/80 dark:border-rose-500/40 rounded-xl px-3 py-2">
+              {error}
+            </div>
+          {/if}
+
+          <button
+            type="submit"
+            class="btn btn-md btn-primary mt-2 self-end disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={submitting}
+          >
+            {submitting ? "Enregistrement..." : "Enregistrer"}
+          </button>
+        </form>
+      {/if}
+    </div>
+  </div>
 </div>
 

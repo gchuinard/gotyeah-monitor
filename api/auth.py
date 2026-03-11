@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
@@ -26,11 +25,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return get_password_hash(plain_password) == hashed_password
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -73,6 +72,11 @@ async def get_current_user(
     return user
 
 
+@router.get("/me", response_model=schemas.UserRead)
+async def read_me(current_user: models.User = Depends(get_current_user)) -> schemas.UserRead:
+    return current_user
+
+
 @router.post("/register", response_model=schemas.UserRead, status_code=status.HTTP_201_CREATED)
 async def register_user(
     payload: schemas.UserCreate, db: AsyncSession = Depends(get_db)
@@ -92,6 +96,31 @@ async def register_user(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.put("/me", response_model=schemas.UserRead)
+async def update_me(
+    payload: schemas.UserUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> schemas.UserRead:
+    if payload.email and payload.email != current_user.email:
+        result = await db.execute(
+            select(models.User).where(models.User.email == payload.email)
+        )
+        if result.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use",
+            )
+        current_user.email = payload.email
+
+    if payload.password:
+        current_user.hashed_password = get_password_hash(payload.password)
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.post("/login", response_model=schemas.Token)

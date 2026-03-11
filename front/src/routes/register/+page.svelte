@@ -77,10 +77,7 @@
 
       <button
         type="submit"
-        class="mt-2 px-4 py-2 rounded-full bg-cyan-500 hover:bg-cyan-400
-               disabled:opacity-50 disabled:cursor-not-allowed
-               text-sm font-medium text-white transition
-               shadow-[0_0_25px_rgba(34,211,238,0.65)] border border-cyan-300"
+        class="btn btn-md btn-primary mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={submitting}
       >
         {submitting ? "Création..." : "Créer le compte"}
