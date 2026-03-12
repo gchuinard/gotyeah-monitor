@@ -6,12 +6,17 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Mettre à jour le code et redémarrer le stack
-        run: |
-          cd /home/pi/sites/gotyeah-monitor
-          git pull
-          docker-compose -f docker-compose.prod.yml down
-          docker-compose -f docker-compose.prod.yml up -d --build
+      - name: Déployer sur le Raspberry Pi via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            cd /home/pi/sites/gotyeah-monitor
+            git pull
+            docker compose -f docker-compose.prod.yml --env-file .env up -d --build --force-recreate
