@@ -25,7 +25,8 @@
 	let authState: AuthState;
 	let viewMode: 'grid' | 'list' = 'grid';
 
-	$: auth.subscribe((v) => (authState = v));
+	// Utilise la réactivité Svelte pour suivre le store auth
+	$: authState = $auth;
 
 	function logout() {
 		clearAuth();

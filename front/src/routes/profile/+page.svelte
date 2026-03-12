@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { get } from 'svelte/store';

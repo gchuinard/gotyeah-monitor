@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, afterUpdate } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 
@@ -29,11 +29,19 @@
 		setTimeout(() => (mounted = true), 20);
 	});
 
-	$: if (prevStatus && status !== prevStatus) {
-		animationClass = status === 'up' ? 'animate-flashGreen' : 'animate-flashRed';
-		prevStatus = status;
-		setTimeout(() => (animationClass = ''), 600);
-	}
+	// On déclenche l'animation lorsqu'on détecte un changement de status,
+	// en utilisant afterUpdate pour éviter un reactive loop.
+	afterUpdate(() => {
+		if (!prevStatus) {
+			prevStatus = status;
+			return;
+		}
+		if (status !== prevStatus) {
+			animationClass = status === 'up' ? 'animate-flashGreen' : 'animate-flashRed';
+			prevStatus = status;
+			setTimeout(() => (animationClass = ''), 600);
+		}
+	});
 	const statusColor = {
 		up: 'text-gotyeah-400',
 		down: 'text-red-400',

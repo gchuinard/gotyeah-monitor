@@ -14,6 +14,7 @@
 		submitting = true;
 		error = null;
 		try {
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const form = new URLSearchParams();
 			form.append('username', email);
 			form.append('password', password);
