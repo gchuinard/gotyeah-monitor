@@ -6,6 +6,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +15,9 @@ import models
 import schemas
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_SECRET")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
@@ -25,11 +28,30 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+pwd_context = CryptContext(
+    schemes=["argon2"],
+    deprecated="auto",
+)
+
+
+def is_legacy_sha256_hash(value: str) -> bool:
+    # Ancien format: sha256 hex (64 chars)
+    return len(value) == 64 and all(c in "0123456789abcdef" for c in value.lower())
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return get_password_hash(plain_password) == hashed_password
+    if is_legacy_sha256_hash(hashed_password):
+        return get_legacy_password_hash(plain_password) == hashed_password
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
+    # Norme actuelle: Argon2id (via passlib)
+    return pwd_context.hash(password)
+
+
+def get_legacy_password_hash(password: str) -> str:
+    # Ancien hash (à migrer automatiquement)
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
@@ -136,6 +158,11 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Migration transparente: si le compte est encore en SHA-256, on rehash en Argon2 au premier login.
+    if is_legacy_sha256_hash(user.hashed_password):
+        user.hashed_password = get_password_hash(form_data.password)
+        await db.commit()
 
     access_token = create_access_token(data={"sub": str(user.id)})
     return schemas.Token(access_token=access_token)
