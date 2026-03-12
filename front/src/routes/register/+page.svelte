@@ -40,7 +40,7 @@
   >
     <div class="flex flex-col gap-1 mb-6">
       <div class="text-xs uppercase tracking-[0.25em] text-slate-400">
-        GotYeah Monitor
+        GotYeah Monitorage
       </div>
       <h1 class="text-2xl font-semibold text-slate-900">Créer un compte</h1>
     </div>
