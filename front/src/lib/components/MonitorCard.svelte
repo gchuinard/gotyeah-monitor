@@ -14,8 +14,8 @@
 	export let createdAt: string;
 	export let expectedStatusCode: number;
 	export let lastStatusCode: number | null;
-  export let onDeleted: (() => void) | undefined;
-  export let compact = false;
+	export let onDeleted: (() => void) | undefined;
+	export let compact = false;
 
 	let showDetails = false;
 	let mode = 1;
@@ -77,50 +77,49 @@
 
 	// Animation fade+slide
 	let mounted = false;
-  let deleting = false;
-  let showConfirmDelete = false;
+	let deleting = false;
+	let showConfirmDelete = false;
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-  function openDeleteConfirm() {
-    if (deleting) return;
-    showConfirmDelete = true;
-  }
+	function openDeleteConfirm() {
+		if (deleting) return;
+		showConfirmDelete = true;
+	}
 
-  function closeDeleteConfirm() {
-    if (deleting) return;
-    showConfirmDelete = false;
-  }
+	function closeDeleteConfirm() {
+		if (deleting) return;
+		showConfirmDelete = false;
+	}
 
-  async function confirmDelete() {
-    if (deleting) return;
-    deleting = true;
+	async function confirmDelete() {
+		if (deleting) return;
+		deleting = true;
 
-    try {
-      const stored =
-        typeof localStorage !== "undefined" ? localStorage.getItem("auth") : null;
-      const token = stored ? (JSON.parse(stored).token as string | null) : null;
+		try {
+			const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
+			const token = stored ? (JSON.parse(stored).token as string | null) : null;
 
-      const res = await fetch(`${API_URL}/monitors/${id}`, {
-        method: "DELETE",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+			const res = await fetch(`${API_URL}/monitors/${id}`, {
+				method: 'DELETE',
+				headers: {
+					...(token ? { Authorization: `Bearer ${token}` } : {})
+				}
+			});
 
-      if (!res.ok && res.status !== 204) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status}`);
-      }
+			if (!res.ok && res.status !== 204) {
+				const text = await res.text().catch(() => '');
+				throw new Error(text || `HTTP ${res.status}`);
+			}
 
-      showConfirmDelete = false;
-      onDeleted?.();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Erreur inconnue");
-    } finally {
-      deleting = false;
-    }
-  }
+			showConfirmDelete = false;
+			onDeleted?.();
+		} catch (e) {
+			alert(e instanceof Error ? e.message : 'Erreur inconnue');
+		} finally {
+			deleting = false;
+		}
+	}
 </script>
 
 <!-- CARD -->
@@ -172,7 +171,9 @@
 					</div>
 					<div>
 						Code HTTP :
-						<span class={lastStatusCode === expectedStatusCode ? 'text-gotyeah-300' : 'text-red-400'}>
+						<span
+							class={lastStatusCode === expectedStatusCode ? 'text-gotyeah-300' : 'text-red-400'}
+						>
 							{lastStatusCode ?? 'N/A'}
 						</span>
 						<span class="text-gray-500"> / {expectedStatusCode}</span>
@@ -190,7 +191,9 @@
 					</div>
 				</div>
 
-				<div class="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
+				<div
+					class="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap"
+				>
 					<span>Dernier check : {formatRelative(lastCheckedAt)}</span>
 					<span>Créé le : {formatDate(createdAt)}</span>
 				</div>
@@ -318,11 +321,7 @@
 					{/if}
 				</button>
 
-				<button
-					class="btn btn-sm btn-primary"
-					type="button"
-					on:click={() => goto(`/edit/${id}`)}
-				>
+				<button class="btn btn-sm btn-primary" type="button" on:click={() => goto(`/edit/${id}`)}>
 					Modifier
 				</button>
 
@@ -401,8 +400,7 @@
 				<h2 class="text-base font-semibold mb-1">Supprimer ce monitor ?</h2>
 				<p class="text-xs text-slate-300 mb-3 leading-relaxed">
 					Tu es sur le point de supprimer
-					<span class="font-semibold text-gotyeah-300">"{name}"</span>. Cette action est
-					définitive.
+					<span class="font-semibold text-gotyeah-300">"{name}"</span>. Cette action est définitive.
 				</p>
 
 				<div class="flex items-center justify-end gap-2 mt-3">
