@@ -12,7 +12,7 @@ from auth import get_current_user
 router = APIRouter(prefix="/monitors", tags=["monitors"])
 
 
-@router.get("/", response_model=List[schemas.MonitorRead])
+@router.get("", response_model=List[schemas.MonitorRead])
 async def list_monitors(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
@@ -25,7 +25,7 @@ async def list_monitors(
 
 
 @router.post(
-    "/", response_model=schemas.MonitorRead, status_code=status.HTTP_201_CREATED
+    "", response_model=schemas.MonitorRead, status_code=status.HTTP_201_CREATED
 )
 async def create_monitor(
     payload: schemas.MonitorCreate,
@@ -72,8 +72,6 @@ async def update_monitor(
     if not monitor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    # Si le monitor est ancien et n'a pas encore d'utilisateur associé,
-    # on l'associe au user courant. Sinon on vérifie l'appartenance.
     if monitor.user_id is None:
         monitor.user_id = current_user.id
     elif monitor.user_id != current_user.id:
@@ -99,8 +97,6 @@ async def delete_monitor(
     if not monitor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    # Même logique que pour update : on permet de "récupérer" les vieux monitors
-    # qui n'avaient pas encore de user_id.
     if monitor.user_id is None:
         monitor.user_id = current_user.id
     elif monitor.user_id != current_user.id:

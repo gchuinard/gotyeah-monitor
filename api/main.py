@@ -19,7 +19,7 @@ from routers import monitors
 from routers import admin
 from auth import router as auth_router
 
-app = FastAPI()
+app = FastAPI(redirect_slashes=False)
 
 
 CHECK_INTERVAL_SECONDS = 600
