@@ -475,114 +475,108 @@
 		role="presentation"
 	>
 		<div
-			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
+			class="w-full max-w-sm mx-4 rounded-2xl overflow-hidden
+                   bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-5"
+                   shadow-[0_0_60px_rgba(56,189,248,0.25)]"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
 		>
-			<!-- Header -->
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-3">
-					<span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-white font-bold text-base shadow">
-						{authState?.user?.email?.[0]?.toUpperCase() ?? '?'}
-					</span>
-					<div class="flex flex-col">
-						<span class="font-semibold text-slate-900 dark:text-slate-50 text-sm">Mon profil</span>
-						<span class="text-xs text-slate-400 truncate max-w-[180px]">{authState?.user?.email}</span>
-					</div>
-				</div>
+			<!-- Header avec dégradé -->
+			<div class="relative bg-gradient-to-br from-cyan-500 to-cyan-700 px-6 pt-6 pb-10">
 				<button
 					type="button"
-					class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+					class="absolute top-4 right-4 h-7 w-7 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
 					on:click={() => (showProfile = false)}
 				>
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
 					</svg>
 				</button>
+				<div class="flex items-center gap-4">
+					<span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white font-bold text-2xl shadow-lg backdrop-blur-sm border border-white/30">
+						{authState?.user?.email?.[0]?.toUpperCase() ?? '?'}
+					</span>
+					<div class="flex flex-col gap-0.5">
+						<span class="font-semibold text-white text-base leading-tight">Mon profil</span>
+						<span class="text-xs text-cyan-100 truncate max-w-[180px]">{authState?.user?.email}</span>
+						<span class="text-[10px] text-cyan-200/70 mt-0.5">{$monitors.length} moniteur{$monitors.length !== 1 ? 's' : ''}</span>
+					</div>
+				</div>
 			</div>
 
-			<!-- Form -->
-			<form class="flex flex-col gap-3" on:submit|preventDefault={saveProfile}>
-				<label class="flex flex-col gap-1">
-					<span class="text-xs text-slate-500 dark:text-slate-400">Email</span>
-					<input
-						type="email"
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						bind:value={profileEmail}
-						required
-					/>
-				</label>
-				<label class="flex flex-col gap-1">
-					<span class="text-xs text-slate-500 dark:text-slate-400">Nouveau mot de passe</span>
-					<input
-						type="password"
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						bind:value={profilePassword}
-						placeholder="Laisser vide pour ne pas changer"
-					/>
-				</label>
+			<!-- Body -->
+			<div class="px-6 pb-6 -mt-5 flex flex-col gap-4">
+				<!-- Form card -->
+				<form
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+					on:submit|preventDefault={saveProfile}
+				>
+					<p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modifier le compte</p>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Email</span>
+						<input
+							type="email"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileEmail}
+							required
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Nouveau mot de passe</span>
+						<input
+							type="password"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profilePassword}
+							placeholder="Laisser vide pour ne pas changer"
+						/>
+					</label>
 
-				{#if profileError}
-					<p class="text-xs text-rose-500 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">{profileError}</p>
-				{/if}
-				{#if profileSuccess}
-					<p class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">{profileSuccess}</p>
-				{/if}
+					{#if profileError}
+						<p class="text-xs text-rose-500 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">{profileError}</p>
+					{/if}
+					{#if profileSuccess}
+						<p class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">{profileSuccess}</p>
+					{/if}
 
-				<div class="flex gap-2 justify-end pt-1">
-					<button type="button" class="btn btn-sm btn-secondary" on:click={() => (showProfile = false)}>
-						Annuler
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary disabled:opacity-50"
-						disabled={profileSubmitting}
-					>
-						{profileSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-					</button>
-				</div>
-			</form>
+					<div class="flex gap-2 justify-end pt-1">
+						<button type="button" class="btn btn-sm btn-secondary" on:click={() => (showProfile = false)}>
+							Annuler
+						</button>
+						<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={profileSubmitting}>
+							{profileSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+						</button>
+					</div>
+				</form>
 
-			<!-- Zone de danger -->
-			<div class="border-t border-slate-200 dark:border-slate-700 pt-4">
-				{#if !profileConfirmDelete}
-					<button
-						type="button"
-						class="w-full text-xs text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors text-left"
-						on:click={() => (profileConfirmDelete = true)}
-					>
-						Supprimer mon compte
-					</button>
-				{:else}
-					<div class="flex flex-col gap-2">
-						<p class="text-xs text-rose-500">
-							Tous tes moniteurs seront supprimés ainsi que ton compte. Cette action est irréversible.
-						</p>
+				<!-- Zone de danger -->
+				<div class="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 flex flex-col gap-2">
+					<p class="text-[11px] font-semibold uppercase tracking-wider text-rose-400">Zone de danger</p>
+					{#if !profileConfirmDelete}
+						<button
+							type="button"
+							class="flex items-center gap-2 text-sm text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-left"
+							on:click={() => (profileConfirmDelete = true)}
+						>
+							<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+							</svg>
+							Supprimer mon compte
+						</button>
+					{:else}
+						<p class="text-xs text-rose-500">Tous tes moniteurs seront supprimés. Cette action est irréversible.</p>
 						<div class="flex gap-2 justify-end">
-							<button
-								type="button"
-								class="btn btn-sm btn-secondary"
-								on:click={() => (profileConfirmDelete = false)}
-								disabled={profileDeleting}
-							>
+							<button type="button" class="btn btn-sm btn-secondary" on:click={() => (profileConfirmDelete = false)} disabled={profileDeleting}>
 								Annuler
 							</button>
-							<button
-								type="button"
-								class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50"
-								on:click={deleteAccount}
-								disabled={profileDeleting}
-							>
-								{profileDeleting ? 'Suppression...' : 'Confirmer la suppression'}
+							<button type="button" class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50" on:click={deleteAccount} disabled={profileDeleting}>
+								{profileDeleting ? 'Suppression...' : 'Confirmer'}
 							</button>
 						</div>
-					</div>
-				{/if}
+					{/if}
+				</div>
 			</div>
-
 		</div>
 	</div>
 {/if}
