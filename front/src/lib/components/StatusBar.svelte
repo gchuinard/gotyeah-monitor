@@ -2,7 +2,10 @@
 	import type { CheckEntry } from '$lib/stores/monitors';
 
 	export let history: CheckEntry[] = [];
-	export let windowHours = 2;
+
+	let windowHours = 2;
+	const MIN_HOURS = 1;
+	const MAX_HOURS = 12;
 
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
@@ -28,7 +31,6 @@
 		const d = toUtcDate(c.checked_at);
 		const label = d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 		const lat = c.latency_ms !== null ? `${c.latency_ms} ms` : 'N/A';
-		// Position relative au conteneur
 		const x = rect.left - containerRect.left + rect.width / 2;
 		const y = rect.top - containerRect.top;
 		tooltip = { label, lat, status: c.status, x, y };
@@ -41,7 +43,19 @@
 
 <div class="flex flex-col gap-1.5" bind:this={containerEl} style="position: relative;">
 	<div class="flex items-center justify-between text-[11px] text-slate-400">
-		<span>2 dernières heures</span>
+		<div class="flex items-center gap-1.5">
+			<button
+				on:click|stopPropagation={() => (windowHours = Math.max(MIN_HOURS, windowHours - 1))}
+				disabled={windowHours <= MIN_HOURS}
+				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
+			>−</button>
+			<span class="tabular-nums">{windowHours}h</span>
+			<button
+				on:click|stopPropagation={() => (windowHours = Math.min(MAX_HOURS, windowHours + 1))}
+				disabled={windowHours >= MAX_HOURS}
+				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
+			>+</button>
+		</div>
 		{#if uptimePct !== null}
 			{#if uptimePct === 100}
 				<span class="text-emerald-400">{uptimePct}% uptime</span>
