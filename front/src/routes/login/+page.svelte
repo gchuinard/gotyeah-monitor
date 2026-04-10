@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { auth, setAuth } from '$lib/stores/auth';
 	import { get } from 'svelte/store';
+	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 
 	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -14,7 +15,6 @@
 		submitting = true;
 		error = null;
 		try {
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const form = new URLSearchParams();
 			form.append('username', email);
 			form.append('password', password);
@@ -26,8 +26,8 @@
 			});
 
 			if (!res.ok) {
-				const text = await res.text().catch(() => '');
-				throw new Error(text || `HTTP ${res.status}`);
+				error = await parseApiError(res, 'login');
+				return;
 			}
 
 			const data = await res.json();
@@ -37,24 +37,22 @@
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			if (!meRes.ok) {
-				throw new Error('Impossible de récupérer le profil utilisateur');
+				error = await parseApiError(meRes, 'récupération du profil');
+				return;
 			}
 			const me = await meRes.json();
 
 			setAuth(token, { id: me.id as number, email: me.email as string });
-
 			await goto('/');
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Erreur inconnue';
+			error = parseNetworkError(e, 'login');
 		} finally {
 			submitting = false;
 		}
 	}
 
 	const current = get(auth);
-	if (current.token) {
-		goto('/');
-	}
+	if (current.token) goto('/');
 </script>
 
 <div class="min-h-screen flex items-center justify-center py-10">
@@ -90,7 +88,10 @@
 			</label>
 
 			{#if error}
-				<div class="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+				<div class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+					<svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+					</svg>
 					{error}
 				</div>
 			{/if}
@@ -106,11 +107,7 @@
 
 		<div class="mt-4 text-xs text-slate-500">
 			Pas encore de compte ?
-			<button
-				type="button"
-				class="text-cyan-600 hover:text-cyan-500 underline"
-				on:click={() => goto('/register')}
-			>
+			<button type="button" class="text-cyan-600 hover:text-cyan-500 underline" on:click={() => goto('/register')}>
 				Créer un compte
 			</button>
 		</div>

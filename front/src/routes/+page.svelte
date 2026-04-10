@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { monitors, type MonitorCardData, type CheckEntry } from '$lib/stores/monitors';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
+	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
 	import { onMount } from 'svelte';
@@ -177,7 +178,7 @@
 			});
 
 			if (!res.ok) {
-				throw new Error(`HTTP ${res.status}`);
+				throw new Error(await parseApiError(res, 'chargement des monitors'));
 			}
 
 			const data = (await res.json()) as MonitorFromApi[];
@@ -202,8 +203,7 @@
 				}))
 			);
 		} catch (err) {
-			console.error('Erreur lors du fetch /monitors', err);
-			error = err instanceof Error ? err.message : 'Erreur inconnue';
+			error = parseNetworkError(err, 'chargement des monitors');
 		} finally {
 			await minDelay;
 			loading = false;
@@ -351,7 +351,12 @@
 		</div>
 
 		{#if error}
-			<div class="px-8 pt-3 pb-2 text-sm text-rose-500">{error}</div>
+			<div class="mx-8 mt-4 flex items-start gap-2 text-sm text-rose-600 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl px-4 py-3">
+				<svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+				</svg>
+				{error}
+			</div>
 		{/if}
 
 		<div
