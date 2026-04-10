@@ -1,4 +1,5 @@
 import asyncio
+import os
 import ssl
 import socket
 from datetime import datetime, timedelta, timezone
@@ -6,7 +7,8 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, delete
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +22,22 @@ from routers import admin
 from auth import router as auth_router
 
 app = FastAPI(redirect_slashes=False)
+
+
+_DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    import traceback
+    content: dict = {"detail": str(exc) if _DEBUG else "Internal server error"}
+    if _DEBUG:
+        content["traceback"] = traceback.format_exc()
+    return JSONResponse(
+        status_code=500,
+        content=content,
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
 
 
 CHECK_INTERVAL_SECONDS = 600
