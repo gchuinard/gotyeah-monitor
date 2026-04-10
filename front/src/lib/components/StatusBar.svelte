@@ -2,13 +2,16 @@
 	import type { CheckEntry } from '$lib/stores/monitors';
 
 	export let history: CheckEntry[] = [];
-	export let maxBars = 90;
+	export let windowHours = 2;
 
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
-	$: displayed = history.slice(-maxBars);
+	$: displayed = (() => {
+		const cutoff = Date.now() - windowHours * 60 * 60 * 1000;
+		return history.filter((c) => toUtcDate(c.checked_at).getTime() >= cutoff);
+	})();
 
 	$: uptimePct =
 		displayed.length === 0
@@ -38,7 +41,7 @@
 
 <div class="flex flex-col gap-1.5" bind:this={containerEl} style="position: relative;">
 	<div class="flex items-center justify-between text-[11px] text-slate-400">
-		<span>Historique des checks</span>
+		<span>2 dernières heures</span>
 		{#if uptimePct !== null}
 			{#if uptimePct === 100}
 				<span class="text-emerald-400">{uptimePct}% uptime</span>
@@ -52,7 +55,7 @@
 
 	<div class="flex gap-[2px] items-stretch h-7 w-full">
 		{#if displayed.length === 0}
-			{#each Array(maxBars) as _}
+			{#each Array(12) as _}
 				<div class="flex-1 rounded-sm bg-slate-700/50"></div>
 			{/each}
 		{:else}
