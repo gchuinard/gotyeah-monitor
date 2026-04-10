@@ -33,6 +33,46 @@
 		openCardId = openCardId === id ? null : id;
 	}
 
+	// Add monitor modal
+	let showAdd = false;
+	let addName = '';
+	let addUrl = '';
+	let addType = 'http';
+	let addExpectedStatusCode = 200;
+	let addSubmitting = false;
+	let addError: string | null = null;
+
+	function openAdd() {
+		addName = '';
+		addUrl = '';
+		addType = 'http';
+		addExpectedStatusCode = 200;
+		addError = null;
+		showAdd = true;
+	}
+
+	async function submitAdd() {
+		addSubmitting = true;
+		addError = null;
+		try {
+			const res = await fetch(`${API_URL}/monitors`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${authState.token}`
+				},
+				body: JSON.stringify({ name: addName, url: addUrl, type: addType, expected_status_code: addExpectedStatusCode })
+			});
+			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+			showAdd = false;
+			await fetchMonitors();
+		} catch (e) {
+			addError = e instanceof Error ? e.message : 'Erreur inconnue';
+		} finally {
+			addSubmitting = false;
+		}
+	}
+
 	// Utilise la réactivité Svelte pour suivre le store auth
 	$: authState = $auth;
 
@@ -271,7 +311,7 @@
 						   bg-cyan-500 hover:bg-cyan-400 text-white
 						   shadow-[0_0_20px_rgba(34,211,238,0.4)] hover:shadow-[0_0_28px_rgba(34,211,238,0.6)]
 						   transition-all"
-					on:click={() => goto('/add')}
+					on:click={openAdd}
 				>
 					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -341,6 +381,91 @@
 			onDeleted={fetchMonitors}
 		/>
 	{/if}
+{/if}
+
+{#if showAdd}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40"
+		on:click={() => (showAdd = false)}
+		role="presentation"
+	>
+		<div
+			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
+                   border border-slate-200 dark:border-slate-700
+                   shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-5"
+			on:click|stopPropagation
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="flex items-center justify-between">
+				<h2 class="font-semibold text-slate-900 dark:text-slate-50">Ajouter un monitor</h2>
+				<button
+					type="button"
+					class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+					on:click={() => (showAdd = false)}
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+					</svg>
+				</button>
+			</div>
+
+			<form class="flex flex-col gap-3" on:submit|preventDefault={submitAdd}>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-500 dark:text-slate-400">Nom</span>
+					<input
+						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+						bind:value={addName}
+						placeholder="Ex: Backend API"
+						required
+					/>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-500 dark:text-slate-400">URL</span>
+					<input
+						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+						bind:value={addUrl}
+						placeholder="https://example.com/health"
+						required
+					/>
+				</label>
+				<div class="grid grid-cols-2 gap-3">
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Type</span>
+						<select
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={addType}
+						>
+							<option value="http">HTTP</option>
+							<option value="ping">Ping</option>
+							<option value="port">Port</option>
+						</select>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Code HTTP attendu</span>
+						<input
+							type="number" min="100" max="599"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={addExpectedStatusCode}
+						/>
+					</label>
+				</div>
+
+				{#if addError}
+					<p class="text-xs text-rose-500 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">{addError}</p>
+				{/if}
+
+				<div class="flex gap-2 justify-end pt-1">
+					<button type="button" class="btn btn-sm btn-secondary" on:click={() => (showAdd = false)}>
+						Annuler
+					</button>
+					<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={addSubmitting}>
+						{addSubmitting ? 'Ajout...' : 'Ajouter'}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
 {/if}
 
 {#if showProfile}
