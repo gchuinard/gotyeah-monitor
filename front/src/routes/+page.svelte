@@ -291,13 +291,13 @@
 				{#if isAdmin}
 					<button
 						type="button"
-						class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
-							   bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400
-							   border border-amber-200 dark:border-amber-700/50
-							   hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all"
+						class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
+							   bg-amber-500 hover:bg-amber-400 text-white
+							   shadow-[0_0_20px_rgba(251,191,36,0.4)] hover:shadow-[0_0_28px_rgba(251,191,36,0.6)]
+							   transition-all"
 						on:click={() => goto('/admin')}
 					>
-						<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+						<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
 							<path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/>
 						</svg>
 						Admin
