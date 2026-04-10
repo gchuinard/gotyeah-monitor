@@ -109,3 +109,23 @@ async def delete_monitor(
     await db.delete(monitor)
     await db.commit()
     return None
+
+
+@router.get("/{monitor_id}/history", response_model=List[schemas.MonitorCheckRead])
+async def get_monitor_history(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> List[schemas.MonitorCheckRead]:
+    monitor = await db.get(models.Monitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    result = await db.execute(
+        select(models.MonitorCheck)
+        .where(models.MonitorCheck.monitor_id == monitor_id)
+        .order_by(models.MonitorCheck.checked_at.asc())
+    )
+    return list(result.scalars().all())
