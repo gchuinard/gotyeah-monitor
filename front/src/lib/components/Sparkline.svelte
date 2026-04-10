@@ -178,7 +178,7 @@
 		{@const tx = tooltipX(hovered.x)}
 		{@const ty = Math.max(pad.top, hovered.y - 36)}
 		<rect x={tx} y={ty} width="90" height="26" rx="5"
-			fill="#1e293b" fill-opacity="0.55" stroke="rgba(148,163,184,0.2)" stroke-width="1" />
+			fill="#1e293b" fill-opacity="0.75" stroke="rgba(148,163,184,0.2)" stroke-width="1" />
 		<text x={tx + 8} y={ty + 10} fill="rgba(148,163,184,0.6)" font-size="9" font-family="monospace">
 			{hovered.label}
 		</text>
