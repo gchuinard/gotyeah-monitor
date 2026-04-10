@@ -15,9 +15,7 @@ import models
 import schemas
 
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY is not set")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
@@ -119,6 +117,19 @@ async def register_user(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me(
+    current_user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    from sqlalchemy import select as sa_select
+    result = await db.execute(sa_select(models.Monitor).where(models.Monitor.user_id == current_user.id))
+    for monitor in result.scalars().all():
+        await db.delete(monitor)
+    await db.delete(current_user)
+    await db.commit()
 
 
 @router.put("/me", response_model=schemas.UserRead)
