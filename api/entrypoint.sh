@@ -10,13 +10,19 @@ from sqlalchemy import text
 
 async def main():
     async with engine.connect() as conn:
-        # Check if alembic_version table exists
+        # Check if alembic_version table exists AND has a row
+        has_version = False
         result = await conn.execute(text("SHOW TABLES LIKE 'alembic_version'"))
-        if not result.fetchone():
-            # Check if tables already exist (DB created before Alembic)
-            result2 = await conn.execute(text("SHOW TABLES LIKE 'users'"))
+        if result.fetchone():
+            result2 = await conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
             if result2.fetchone():
-                print("Pre-existing DB detected (no alembic_version), stamping as 0001...")
+                has_version = True
+
+        if not has_version:
+            # Check if tables already exist (DB created before Alembic)
+            result3 = await conn.execute(text("SHOW TABLES LIKE 'users'"))
+            if result3.fetchone():
+                print("Pre-existing DB detected, stamping as 0001...")
                 subprocess.run(["python", "-m", "alembic", "stamp", "0001"], check=True)
             else:
                 print("Fresh DB, will run full migrations.")
