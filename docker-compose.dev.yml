@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: monitor_api_dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    env_file:
+      - .env.dev
+    environment:
+      - DEBUG=true
+    depends_on:
+      - db
+    networks:
+      - monitor_dev_net
+
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: monitor_front_dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - monitor_dev_net
+
+  db:
+    image: mysql:8
+    container_name: monitor_db_dev
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    volumes:
+      - db_dev_data:/var/lib/mysql
+    networks:
+      - monitor_dev_net
+    ports:
+      - "3307:3306"
+
+volumes:
+  db_dev_data:
+
+networks:
+  monitor_dev_net:
+    driver: bridge
