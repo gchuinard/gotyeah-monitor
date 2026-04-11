@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { monitors, type MonitorCardData, type CheckEntry } from '$lib/stores/monitors';
+	import { monitors, type CheckEntry } from '$lib/stores/monitors';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
@@ -270,7 +270,9 @@
 				const data = await res.json();
 				isAdmin = data.is_admin;
 			}
-		} catch {}
+		} catch {
+			/* ignore — admin check is best-effort */
+		}
 	}
 
 	onMount(() => {

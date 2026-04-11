@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import { auth, setAuth } from '$lib/stores/auth';
 	import { get } from 'svelte/store';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
@@ -15,7 +16,7 @@
 		submitting = true;
 		error = null;
 		try {
-			const form = new URLSearchParams();
+			const form = new SvelteURLSearchParams();
 			form.append('username', email);
 			form.append('password', password);
 

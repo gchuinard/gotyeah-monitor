@@ -23,7 +23,7 @@
 </script>
 
 <ul class="flex flex-col gap-1 mt-1">
-	{#each rules as rule}
+	{#each rules as rule (rule.key)}
 		<li
 			class="flex items-center gap-1.5 text-xs {checks[rule.key]
 				? 'text-emerald-600'

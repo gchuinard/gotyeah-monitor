@@ -27,7 +27,12 @@ export default defineConfig(
 			'no-undef': 'off',
 			// On utilise encore goto()/href internes de façon classique,
 			// on désactive donc cette règle trop stricte pour le moment.
-			'svelte/no-navigation-without-resolve': 'off'
+			'svelte/no-navigation-without-resolve': 'off',
+			// Variables préfixées par _ sont intentionnellement ignorées (ex: each placeholders)
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{ varsIgnorePattern: '^_', argsIgnorePattern: '^_' }
+			]
 		}
 	},
 	{

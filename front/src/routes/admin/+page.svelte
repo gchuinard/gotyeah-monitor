@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { auth, clearAuth } from '$lib/stores/auth';
+	import { auth } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 

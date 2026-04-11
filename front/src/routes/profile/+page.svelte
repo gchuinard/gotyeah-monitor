@@ -17,12 +17,6 @@
 	let success: string | null = null;
 
 	$: passwordsMatch = confirmPassword === '' || newPassword === confirmPassword;
-	$: passwordError =
-		newPassword && !passwordValid
-			? 'Le mot de passe ne respecte pas les critères.'
-			: newPassword && confirmPassword && !passwordsMatch
-				? 'Les mots de passe ne correspondent pas.'
-				: null;
 	$: canSubmit =
 		!submitting && (!newPassword || (passwordValid && newPassword === confirmPassword));
 

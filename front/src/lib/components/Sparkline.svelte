@@ -6,7 +6,7 @@
 	const VW = 500;
 	const pad = { top: 12, right: 12, bottom: 22, left: 44 };
 
-	$: plotW = VW - pad.left - pad.right;
+	const plotW = VW - pad.left - pad.right;
 	$: plotH = height - pad.top - pad.bottom;
 
 	$: min = values.length ? Math.min(...values) : 0;
@@ -124,7 +124,7 @@
 	</defs>
 
 	<!-- Grille Y -->
-	{#each gridLines as gl}
+	{#each gridLines as gl (gl.label)}
 		<line
 			x1={pad.left}
 			y1={gl.y}
@@ -183,7 +183,7 @@
 	>
 
 	<!-- Labels X heure -->
-	{#each xLabels as xl}
+	{#each xLabels as xl (xl.x)}
 		<line
 			x1={xl.x}
 			y1={baseline}

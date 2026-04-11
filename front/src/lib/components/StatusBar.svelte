@@ -77,7 +77,7 @@
 
 	<div class="flex gap-[2px] items-stretch h-7 w-full">
 		{#if displayed.length === 0}
-			{#each Array(12) as _}
+			{#each Array(12) as _placeholder, i (i)}
 				<div class="flex-1 rounded-sm bg-slate-700/50"></div>
 			{/each}
 		{:else}
