@@ -24,14 +24,30 @@
 
 <ul class="flex flex-col gap-1 mt-1">
 	{#each rules as rule}
-		<li class="flex items-center gap-1.5 text-xs {checks[rule.key] ? 'text-emerald-600' : 'text-slate-400'}">
+		<li
+			class="flex items-center gap-1.5 text-xs {checks[rule.key]
+				? 'text-emerald-600'
+				: 'text-slate-400'}"
+		>
 			{#if checks[rule.key]}
-				<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+				<svg
+					class="w-3.5 h-3.5 shrink-0"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+					viewBox="0 0 24 24"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 				</svg>
 			{:else}
-				<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<circle cx="12" cy="12" r="9"/>
+				<svg
+					class="w-3.5 h-3.5 shrink-0"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					viewBox="0 0 24 24"
+				>
+					<circle cx="12" cy="12" r="9" />
 				</svg>
 			{/if}
 			{rule.label}

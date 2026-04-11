@@ -16,7 +16,9 @@
 	}
 
 	/* Les inputs ont toujours un texte sombre (fond clair dans les formulaires) */
-	input, textarea, select {
+	input,
+	textarea,
+	select {
 		@apply text-slate-900;
 	}
 }

@@ -93,10 +93,15 @@
 			<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 				<div class="flex items-center gap-2">
 					<h2 class="font-semibold text-sm text-slate-900 dark:text-slate-50 truncate">{name}</h2>
-					<span class="px-1.5 py-0.5 text-[10px] rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0">{type}</span>
+					<span
+						class="px-1.5 py-0.5 text-[10px] rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0"
+						>{type}</span
+					>
 				</div>
 				<div class="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-					<span class={`font-medium ${latencyColor(latency)}`}>{latency !== null ? `${latency} ms` : 'N/A'}</span>
+					<span class={`font-medium ${latencyColor(latency)}`}
+						>{latency !== null ? `${latency} ms` : 'N/A'}</span
+					>
 					<span class="truncate text-cyan-600">{url}</span>
 					<span class="text-slate-500">{formatRelative(lastCheckedAt)}</span>
 				</div>
@@ -108,7 +113,10 @@
 				<span class="text-xl">{statusIcon[status]}</span>
 				<h2 class="font-semibold text-lg text-slate-900 dark:text-slate-50">{name}</h2>
 			</div>
-			<span class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30">{type}</span>
+			<span
+				class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
+				>{type}</span
+			>
 		</div>
 
 		<div class="flex items-center gap-3 text-sm">
@@ -122,9 +130,14 @@
 		</div>
 
 		<div class="text-xs text-slate-500 dark:text-slate-400">
-			<a href={url} target="_blank" rel="noreferrer"
+			<a
+				href={url}
+				target="_blank"
+				rel="noreferrer"
 				class="truncate text-cyan-600 hover:text-cyan-500 hover:underline block"
-				title={url} on:click|stopPropagation>{url}</a>
+				title={url}
+				on:click|stopPropagation>{url}</a
+			>
 			<span class="mt-0.5 block">{formatRelative(lastCheckedAt)}</span>
 		</div>
 	{/if}

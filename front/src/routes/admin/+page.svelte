@@ -63,7 +63,7 @@
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			if (res.status === 403) {
-				error = 'Accès refusé. Vous n\'êtes pas administrateur.';
+				error = "Accès refusé. Vous n'êtes pas administrateur.";
 				return;
 			}
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -194,11 +194,7 @@
 				</div>
 			</div>
 			<div class="flex items-center gap-3">
-				<button
-					type="button"
-					class="btn btn-sm btn-secondary"
-					on:click={() => goto('/')}
-				>
+				<button type="button" class="btn btn-sm btn-secondary" on:click={() => goto('/')}>
 					← Dashboard
 				</button>
 				<button
@@ -214,11 +210,33 @@
 
 		<!-- Stats bar -->
 		{#if !loading && !error}
-			<div class="flex gap-6 px-8 py-4 border-b border-slate-200/60 dark:border-slate-800/60 text-sm text-slate-500 dark:text-slate-400">
-				<span><strong class="text-slate-900 dark:text-slate-50">{users.length}</strong> utilisateurs</span>
-				<span><strong class="text-slate-900 dark:text-slate-50">{users.reduce((acc, u) => acc + u.monitors.length, 0)}</strong> moniteurs total</span>
-				<span><strong class="text-emerald-400">{users.reduce((acc, u) => acc + u.monitors.filter(m => m.status === 'up').length, 0)}</strong> up</span>
-				<span><strong class="text-rose-400">{users.reduce((acc, u) => acc + u.monitors.filter(m => m.status === 'down').length, 0)}</strong> down</span>
+			<div
+				class="flex gap-6 px-8 py-4 border-b border-slate-200/60 dark:border-slate-800/60 text-sm text-slate-500 dark:text-slate-400"
+			>
+				<span
+					><strong class="text-slate-900 dark:text-slate-50">{users.length}</strong> utilisateurs</span
+				>
+				<span
+					><strong class="text-slate-900 dark:text-slate-50"
+						>{users.reduce((acc, u) => acc + u.monitors.length, 0)}</strong
+					> moniteurs total</span
+				>
+				<span
+					><strong class="text-emerald-400"
+						>{users.reduce(
+							(acc, u) => acc + u.monitors.filter((m) => m.status === 'up').length,
+							0
+						)}</strong
+					> up</span
+				>
+				<span
+					><strong class="text-rose-400"
+						>{users.reduce(
+							(acc, u) => acc + u.monitors.filter((m) => m.status === 'down').length,
+							0
+						)}</strong
+					> down</span
+				>
 			</div>
 		{/if}
 
@@ -264,9 +282,9 @@
 										<span class="text-slate-500 dark:text-slate-400">
 											{user.monitors.length} moniteur{user.monitors.length !== 1 ? 's' : ''}
 										</span>
-										{#if user.monitors.some(m => m.status === 'down')}
+										{#if user.monitors.some((m) => m.status === 'down')}
 											<span class="inline-block h-2 w-2 rounded-full bg-rose-400"></span>
-										{:else if user.monitors.some(m => m.status === 'up')}
+										{:else if user.monitors.some((m) => m.status === 'up')}
 											<span class="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
 										{/if}
 									</div>
@@ -278,8 +296,13 @@
 										Supprimer le compte
 									</button>
 									<svg
-										class="w-4 h-4 text-slate-400 transition-transform {expandedUserId === user.id ? 'rotate-180' : ''}"
-										fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+										class="w-4 h-4 text-slate-400 transition-transform {expandedUserId === user.id
+											? 'rotate-180'
+											: ''}"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										stroke-width="2"
 									>
 										<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
 									</svg>
@@ -294,7 +317,9 @@
 									{:else}
 										<table class="w-full text-sm">
 											<thead>
-												<tr class="text-xs uppercase tracking-wider text-slate-400 border-b border-slate-200/50 dark:border-slate-700/50">
+												<tr
+													class="text-xs uppercase tracking-wider text-slate-400 border-b border-slate-200/50 dark:border-slate-700/50"
+												>
 													<th class="px-6 py-3 text-left">Nom</th>
 													<th class="px-4 py-3 text-left">URL</th>
 													<th class="px-4 py-3 text-left">Type</th>
@@ -310,34 +335,53 @@
 														class="border-b border-slate-100/60 dark:border-slate-700/30 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 cursor-pointer"
 														on:click={() => openEdit(monitor, user.id)}
 													>
-														<td class="px-6 py-3 font-medium text-slate-800 dark:text-slate-200">{monitor.name}</td>
-														<td class="px-4 py-3 text-slate-500 dark:text-slate-400 max-w-[200px] truncate">
-															<a href={monitor.url} target="_blank" rel="noopener noreferrer" class="hover:text-cyan-500 transition-colors">{monitor.url}</a>
+														<td class="px-6 py-3 font-medium text-slate-800 dark:text-slate-200"
+															>{monitor.name}</td
+														>
+														<td
+															class="px-4 py-3 text-slate-500 dark:text-slate-400 max-w-[200px] truncate"
+														>
+															<a
+																href={monitor.url}
+																target="_blank"
+																rel="noopener noreferrer"
+																class="hover:text-cyan-500 transition-colors">{monitor.url}</a
+															>
 														</td>
-														<td class="px-4 py-3 text-slate-500 dark:text-slate-400 uppercase text-xs">{monitor.type}</td>
+														<td
+															class="px-4 py-3 text-slate-500 dark:text-slate-400 uppercase text-xs"
+															>{monitor.type}</td
+														>
 														<td class="px-4 py-3">
-															<span class="inline-flex items-center gap-1.5 {statusColor(monitor.status)}">
-																<span class="h-1.5 w-1.5 rounded-full {statusDot(monitor.status)}"></span>
+															<span
+																class="inline-flex items-center gap-1.5 {statusColor(
+																	monitor.status
+																)}"
+															>
+																<span class="h-1.5 w-1.5 rounded-full {statusDot(monitor.status)}"
+																></span>
 																{monitor.status}
 															</span>
 														</td>
 														<td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">
-															{monitor.last_latency_ms !== null ? `${monitor.last_latency_ms} ms` : '—'}
+															{monitor.last_latency_ms !== null
+																? `${monitor.last_latency_ms} ms`
+																: '—'}
 														</td>
 														<td class="px-4 py-3 text-right text-slate-400 text-xs">
 															{monitor.last_checked_at
 																? new Date(monitor.last_checked_at).toLocaleString('fr-FR')
 																: '—'}
 														</td>
-													<td class="px-4 py-3 text-right">
-														<button
-															type="button"
-															class="text-xs text-rose-400 hover:text-rose-600 transition-colors"
-															on:click|stopPropagation={() => askDelete(monitor, user.email)}
-														>
-															Supprimer
-														</button>
-													</td>
+														<td class="px-4 py-3 text-right">
+															<button
+																type="button"
+																class="text-xs text-rose-400 hover:text-rose-600 transition-colors"
+																on:click|stopPropagation={() => askDelete(monitor, user.email)}
+															>
+																Supprimer
+															</button>
+														</td>
 													</tr>
 												{/each}
 											</tbody>
@@ -367,7 +411,9 @@
 			role="dialog"
 			aria-modal="true"
 		>
-			<h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">Modifier le moniteur</h3>
+			<h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+				Modifier le moniteur
+			</h3>
 
 			<div class="flex flex-col gap-3">
 				<label class="flex flex-col gap-1">
@@ -414,11 +460,7 @@
 			{/if}
 
 			<div class="flex gap-3 justify-end">
-				<button
-					type="button"
-					class="btn btn-sm btn-secondary"
-					on:click={() => (editModal = null)}
-				>
+				<button type="button" class="btn btn-sm btn-secondary" on:click={() => (editModal = null)}>
 					Annuler
 				</button>
 				<button
@@ -452,9 +494,21 @@
 		>
 			<div class="flex flex-col gap-3">
 				<div class="flex items-center gap-3">
-					<span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 shrink-0">
-						<svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+					<span
+						class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 shrink-0"
+					>
+						<svg
+							class="w-5 h-5 text-rose-500"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+							/>
 						</svg>
 					</span>
 					<h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -463,16 +517,27 @@
 				</div>
 				<p class="text-sm text-slate-500 dark:text-slate-400">
 					{#if confirmModal.kind === 'monitor'}
-						Tu es sur le point de supprimer <span class="font-medium text-slate-700 dark:text-slate-200">"{confirmModal.monitorName}"</span> du compte <span class="font-medium text-slate-700 dark:text-slate-200">{confirmModal.userEmail}</span>.
+						Tu es sur le point de supprimer <span
+							class="font-medium text-slate-700 dark:text-slate-200"
+							>"{confirmModal.monitorName}"</span
+						>
+						du compte
+						<span class="font-medium text-slate-700 dark:text-slate-200"
+							>{confirmModal.userEmail}</span
+						>.
 					{:else}
-						Tu es sur le point de supprimer le compte <span class="font-medium text-slate-700 dark:text-slate-200">{confirmModal.userEmail}</span> ainsi que tous ses moniteurs.
+						Tu es sur le point de supprimer le compte <span
+							class="font-medium text-slate-700 dark:text-slate-200">{confirmModal.userEmail}</span
+						> ainsi que tous ses moniteurs.
 					{/if}
 					Cette action est irréversible.
 				</p>
 				<label class="flex flex-col gap-1">
 					<span class="text-xs text-slate-500 dark:text-slate-400">
 						{#if confirmModal.kind === 'monitor'}
-							Tape <strong class="text-slate-700 dark:text-slate-200">{confirmModal.monitorName}</strong> pour confirmer
+							Tape <strong class="text-slate-700 dark:text-slate-200"
+								>{confirmModal.monitorName}</strong
+							> pour confirmer
 						{:else}
 							Tape <strong class="text-slate-700 dark:text-slate-200">supprimer</strong> pour confirmer
 						{/if}
@@ -489,7 +554,10 @@
 				<button
 					type="button"
 					class="btn btn-sm btn-secondary"
-					on:click={() => { confirmModal = null; confirmText = ''; }}
+					on:click={() => {
+						confirmModal = null;
+						confirmText = '';
+					}}
 				>
 					Annuler
 				</button>
@@ -497,7 +565,9 @@
 					type="button"
 					class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50"
 					on:click={confirmDelete}
-					disabled={confirmModal.kind === 'monitor' ? confirmText !== confirmModal.monitorName : confirmText !== 'supprimer'}
+					disabled={confirmModal.kind === 'monitor'
+						? confirmText !== confirmModal.monitorName
+						: confirmText !== 'supprimer'}
 				>
 					Supprimer
 				</button>

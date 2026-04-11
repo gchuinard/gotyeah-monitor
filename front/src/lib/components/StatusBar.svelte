@@ -22,14 +22,20 @@
 			: Math.round((displayed.filter((c) => c.status === 'up').length / displayed.length) * 100);
 
 	// ── Tooltip custom ────────────────────────────────────────────────────
-	let tooltip: { label: string; lat: string; status: 'up' | 'down'; x: number; y: number } | null = null;
+	let tooltip: { label: string; lat: string; status: 'up' | 'down'; x: number; y: number } | null =
+		null;
 	let containerEl: HTMLDivElement;
 
 	function onEnter(e: MouseEvent, c: CheckEntry) {
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		const containerRect = containerEl.getBoundingClientRect();
 		const d = toUtcDate(c.checked_at);
-		const label = d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+		const label = d.toLocaleString('fr-FR', {
+			day: '2-digit',
+			month: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 		const lat = c.latency_ms !== null ? `${c.latency_ms} ms` : 'N/A';
 		const x = rect.left - containerRect.left + rect.width / 2;
 		const y = rect.top - containerRect.top;
@@ -48,13 +54,15 @@
 				on:click|stopPropagation={() => (windowHours = Math.max(MIN_HOURS, windowHours - 1))}
 				disabled={windowHours <= MIN_HOURS}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
-			>−</button>
+				>−</button
+			>
 			<span class="tabular-nums">{windowHours}h</span>
 			<button
 				on:click|stopPropagation={() => (windowHours = Math.min(MAX_HOURS, windowHours + 1))}
 				disabled={windowHours >= MAX_HOURS}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
-			>+</button>
+				>+</button
+			>
 		</div>
 		{#if uptimePct !== null}
 			{#if uptimePct === 100}
@@ -92,8 +100,26 @@
 	</div>
 
 	<div class="flex justify-between text-[10px] text-slate-500">
-		<span>{displayed.length > 0 ? toUtcDate(displayed[0].checked_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
-		<span>{displayed.length > 0 ? toUtcDate(displayed[displayed.length - 1].checked_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+		<span
+			>{displayed.length > 0
+				? toUtcDate(displayed[0].checked_at).toLocaleString('fr-FR', {
+						day: '2-digit',
+						month: '2-digit',
+						hour: '2-digit',
+						minute: '2-digit'
+					})
+				: ''}</span
+		>
+		<span
+			>{displayed.length > 0
+				? toUtcDate(displayed[displayed.length - 1].checked_at).toLocaleString('fr-FR', {
+						day: '2-digit',
+						month: '2-digit',
+						hour: '2-digit',
+						minute: '2-digit'
+					})
+				: ''}</span
+		>
 	</div>
 
 	<!-- Tooltip custom, instantané -->

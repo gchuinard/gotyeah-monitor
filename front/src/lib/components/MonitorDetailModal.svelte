@@ -151,262 +151,381 @@
 		aria-modal="true"
 	>
 		{#if editing}
-		<!-- ── Formulaire d'édition ───────────────────────────────────────── -->
-		<div class="flex items-center justify-between px-6 pt-5">
-			<h2 class="font-bold text-lg text-slate-50">Modifier le monitor</h2>
-			<button
-				class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
-				on:click={() => (editing = false)} aria-label="Retour"
-			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-				</svg>
-			</button>
-		</div>
-
-		<form class="px-6 pb-6 flex flex-col gap-4" on:submit|preventDefault={saveEdit}>
-			<label class="flex flex-col gap-1">
-				<span class="text-xs text-slate-400 uppercase tracking-wide">Nom</span>
-				<input
-					class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
-						   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
-					bind:value={editName} required
-				/>
-			</label>
-			<label class="flex flex-col gap-1">
-				<span class="text-xs text-slate-400 uppercase tracking-wide">URL</span>
-				<input
-					class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
-						   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
-					bind:value={editUrl} required
-				/>
-			</label>
-			<div class="grid grid-cols-2 gap-3">
-				<label class="flex flex-col gap-1">
-					<span class="text-xs text-slate-400 uppercase tracking-wide">Type</span>
-					<select
-						class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
-							   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
-						bind:value={editType}
-					>
-						<option value="http">HTTP</option>
-						<option value="ping">Ping</option>
-						<option value="port">Port</option>
-					</select>
-				</label>
-				<label class="flex flex-col gap-1">
-					<span class="text-xs text-slate-400 uppercase tracking-wide">Code HTTP attendu</span>
-					<input
-						type="number" min="100" max="599"
-						class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
-							   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
-						bind:value={editExpectedCode}
-					/>
-				</label>
-			</div>
-
-			{#if editError}
-				<p class="text-xs text-rose-400 bg-rose-900/20 border border-rose-800/50 rounded-xl px-3 py-2">
-					{editError}
-				</p>
-			{/if}
-
-			<div class="flex justify-end gap-2 pt-1">
-				<button type="button" class="btn btn-sm btn-secondary" on:click={() => (editing = false)} disabled={submitting}>
-					Annuler
-				</button>
-				<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={submitting}>
-					{submitting ? 'Enregistrement...' : 'Enregistrer'}
-				</button>
-			</div>
-		</form>
-
-		{:else}
-		<!-- ── Vue détail ─────────────────────────────────────────────────── -->
-
-		<!-- Header -->
-		<div class="flex items-center justify-between px-6 pt-5">
-			<div class="flex items-center gap-3">
-				<span class="text-2xl">{statusIcon[monitor.status]}</span>
-				<div>
-					<h2 class="font-bold text-lg text-slate-50 leading-tight">{monitor.name}</h2>
-					<a
-						href={monitor.url}
-						target="_blank"
-						rel="noreferrer"
-						class="text-xs text-cyan-500 hover:underline block truncate max-w-xs"
-					>{monitor.url}</a>
-				</div>
-			</div>
-			<div class="flex items-center gap-2">
-				<span class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30">
-					{monitor.type}
-				</span>
+			<!-- ── Formulaire d'édition ───────────────────────────────────────── -->
+			<div class="flex items-center justify-between px-6 pt-5">
+				<h2 class="font-bold text-lg text-slate-50">Modifier le monitor</h2>
 				<button
 					class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
-					on:click={onClose}
-					aria-label="Fermer"
+					on:click={() => (editing = false)}
+					aria-label="Retour"
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<svg
+						class="w-4 h-4"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						viewBox="0 0 24 24"
+					>
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
 				</button>
 			</div>
-		</div>
 
-		<!-- Stats -->
-		<div class="grid grid-cols-3 gap-3 px-6">
-			<div class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5">
-				<span class="text-[10px] text-slate-500 uppercase tracking-wide">Statut</span>
-				<span class={`text-sm font-semibold ${statusColor[monitor.status]}`}>
-					{monitor.status === 'up' ? 'Online' : monitor.status === 'down' ? 'Offline' : 'Checking...'}
-				</span>
-			</div>
-			<div class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5">
-				<span class="text-[10px] text-slate-500 uppercase tracking-wide">Latence</span>
-				<span class={`text-sm font-semibold ${latencyColor(monitor.latency)}`}>
-					{monitor.latency !== null ? `${monitor.latency} ms` : 'N/A'}
-				</span>
-			</div>
-			<div class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5">
-				<span class="text-[10px] text-slate-500 uppercase tracking-wide">HTTP</span>
-				<span class={`text-sm font-semibold ${monitor.lastStatusCode === monitor.expectedStatusCode ? 'text-emerald-400' : 'text-red-400'}`}>
-					{monitor.lastStatusCode ?? 'N/A'}
-					<span class="text-slate-500 font-normal text-xs">/ {monitor.expectedStatusCode}</span>
-				</span>
-			</div>
-		</div>
-
-		<!-- SSL -->
-		{#if monitor.sslExpiryAt !== null}
-			{@const ssl = sslStatus(monitor.sslExpiryAt)}
-			<div class="px-6 flex items-center justify-between text-xs">
-				<span class="text-slate-400 flex items-center gap-1.5">
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-					</svg>
-					Certificat SSL
-				</span>
-				<span class={`font-medium ${ssl.color}`}>
-					{ssl.label} · exp. {toUtcDate(monitor.sslExpiryAt).toLocaleDateString('fr-FR')}
-				</span>
-			</div>
-		{/if}
-
-		<!-- Status bar -->
-		<div class="px-6">
-			<StatusBar history={monitor.history} />
-		</div>
-
-		<!-- Graphiques -->
-		<div class="px-6 flex flex-col gap-4">
-
-			<!-- Tabs -->
-			<div class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
-				<button
-					class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-						${mode === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-					on:click={() => (mode = 0)}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke-linecap="round" stroke-linejoin="round"/>
-					</svg>
-					Latence
-				</button>
-				<button
-					class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-						${mode === 1 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-					on:click={() => (mode = 1)}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-					</svg>
-					Les deux
-				</button>
-				<button
-					class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-						${mode === 2 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-					on:click={() => (mode = 2)}
-				>
-					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<line x1="8" y1="6" x2="21" y2="6" stroke-linecap="round"/><line x1="8" y1="12" x2="21" y2="12" stroke-linecap="round"/><line x1="8" y1="18" x2="21" y2="18" stroke-linecap="round"/><circle cx="3" cy="6" r="1.5" fill="currentColor"/><circle cx="3" cy="12" r="1.5" fill="currentColor"/><circle cx="3" cy="18" r="1.5" fill="currentColor"/>
-					</svg>
-					Historique
-				</button>
-			</div>
-
-			{#if mode === 0 || mode === 1}
-				<Sparkline
-					values={latencyValues}
-					timestamps={monitor.history.filter(c => c.latency_ms !== null).map(c => c.checked_at)}
-					height={160}
-				/>
-			{/if}
-
-			{#if mode === 1 || mode === 2}
-				<div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
-					{#each [...monitor.history].reverse() as c (c.id)}
-						<div class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs">
-							{#if c.status === 'up'}
-								<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-							{:else}
-								<span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
-							{/if}
-							<span class={`font-mono font-medium ${c.latency_ms !== null ? latencyColor(c.latency_ms) : 'text-gray-500'}`}>
-								{c.latency_ms !== null ? `${c.latency_ms} ms` : '—'}
-							</span>
-							<span class="ml-auto text-slate-500 font-mono text-[11px]">
-								{toUtcDate(c.checked_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-							</span>
-						</div>
-					{/each}
+			<form class="px-6 pb-6 flex flex-col gap-4" on:submit|preventDefault={saveEdit}>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-400 uppercase tracking-wide">Nom</span>
+					<input
+						class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
+						   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+						bind:value={editName}
+						required
+					/>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-400 uppercase tracking-wide">URL</span>
+					<input
+						class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
+						   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+						bind:value={editUrl}
+						required
+					/>
+				</label>
+				<div class="grid grid-cols-2 gap-3">
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Type</span>
+						<select
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
+							   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+							bind:value={editType}
+						>
+							<option value="http">HTTP</option>
+							<option value="ping">Ping</option>
+							<option value="port">Port</option>
+						</select>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Code HTTP attendu</span>
+						<input
+							type="number"
+							min="100"
+							max="599"
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100
+							   focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+							bind:value={editExpectedCode}
+						/>
+					</label>
 				</div>
-			{/if}
-		</div>
 
-		<!-- Footer -->
-		{#if !showConfirmDelete}
-			<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex items-center justify-between">
-				<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
-					<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
-					<span>Créé le : {formatDate(monitor.createdAt)}</span>
-				</div>
-				<div class="flex items-center gap-2">
-					<button class="btn btn-sm btn-primary" on:click={openEdit}>
-						Modifier
-					</button>
-					<button
-						class="btn btn-sm btn-danger disabled:opacity-50"
-						on:click={() => (showConfirmDelete = true)}
-						disabled={deleting}
+				{#if editError}
+					<p
+						class="text-xs text-rose-400 bg-rose-900/20 border border-rose-800/50 rounded-xl px-3 py-2"
 					>
-						Supprimer
-					</button>
-				</div>
-			</div>
-		{:else}
-			<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex flex-col gap-3">
-				<p class="text-xs text-slate-400">
-					Tape <strong class="text-white">{monitor.name}</strong> pour confirmer la suppression.
-				</p>
-				<input
-					type="text"
-					class="w-full rounded-lg border border-rose-400 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
-					bind:value={deleteConfirmText}
-					placeholder={monitor.name}
-					disabled={deleting}
-				/>
-				<div class="flex gap-2 justify-end">
-					<button class="btn btn-sm btn-secondary" on:click={() => { showConfirmDelete = false; deleteConfirmText = ''; }} disabled={deleting}>
+						{editError}
+					</p>
+				{/if}
+
+				<div class="flex justify-end gap-2 pt-1">
+					<button
+						type="button"
+						class="btn btn-sm btn-secondary"
+						on:click={() => (editing = false)}
+						disabled={submitting}
+					>
 						Annuler
 					</button>
-					<button class="btn btn-sm btn-danger disabled:opacity-50" on:click={confirmDelete} disabled={deleting || deleteConfirmText !== monitor.name}>
-						{deleting ? 'Suppression...' : 'Supprimer définitivement'}
+					<button
+						type="submit"
+						class="btn btn-sm btn-primary disabled:opacity-50"
+						disabled={submitting}
+					>
+						{submitting ? 'Enregistrement...' : 'Enregistrer'}
+					</button>
+				</div>
+			</form>
+		{:else}
+			<!-- ── Vue détail ─────────────────────────────────────────────────── -->
+
+			<!-- Header -->
+			<div class="flex items-center justify-between px-6 pt-5">
+				<div class="flex items-center gap-3">
+					<span class="text-2xl">{statusIcon[monitor.status]}</span>
+					<div>
+						<h2 class="font-bold text-lg text-slate-50 leading-tight">{monitor.name}</h2>
+						<a
+							href={monitor.url}
+							target="_blank"
+							rel="noreferrer"
+							class="text-xs text-cyan-500 hover:underline block truncate max-w-xs">{monitor.url}</a
+						>
+					</div>
+				</div>
+				<div class="flex items-center gap-2">
+					<span
+						class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
+					>
+						{monitor.type}
+					</span>
+					<button
+						class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+						on:click={onClose}
+						aria-label="Fermer"
+					>
+						<svg
+							class="w-4 h-4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							viewBox="0 0 24 24"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+						</svg>
 					</button>
 				</div>
 			</div>
-		{/if}
 
+			<!-- Stats -->
+			<div class="grid grid-cols-3 gap-3 px-6">
+				<div
+					class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5"
+				>
+					<span class="text-[10px] text-slate-500 uppercase tracking-wide">Statut</span>
+					<span class={`text-sm font-semibold ${statusColor[monitor.status]}`}>
+						{monitor.status === 'up'
+							? 'Online'
+							: monitor.status === 'down'
+								? 'Offline'
+								: 'Checking...'}
+					</span>
+				</div>
+				<div
+					class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5"
+				>
+					<span class="text-[10px] text-slate-500 uppercase tracking-wide">Latence</span>
+					<span class={`text-sm font-semibold ${latencyColor(monitor.latency)}`}>
+						{monitor.latency !== null ? `${monitor.latency} ms` : 'N/A'}
+					</span>
+				</div>
+				<div
+					class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex flex-col gap-0.5"
+				>
+					<span class="text-[10px] text-slate-500 uppercase tracking-wide">HTTP</span>
+					<span
+						class={`text-sm font-semibold ${monitor.lastStatusCode === monitor.expectedStatusCode ? 'text-emerald-400' : 'text-red-400'}`}
+					>
+						{monitor.lastStatusCode ?? 'N/A'}
+						<span class="text-slate-500 font-normal text-xs">/ {monitor.expectedStatusCode}</span>
+					</span>
+				</div>
+			</div>
+
+			<!-- SSL -->
+			{#if monitor.sslExpiryAt !== null}
+				{@const ssl = sslStatus(monitor.sslExpiryAt)}
+				<div class="px-6 flex items-center justify-between text-xs">
+					<span class="text-slate-400 flex items-center gap-1.5">
+						<svg
+							class="w-3.5 h-3.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+							/>
+						</svg>
+						Certificat SSL
+					</span>
+					<span class={`font-medium ${ssl.color}`}>
+						{ssl.label} · exp. {toUtcDate(monitor.sslExpiryAt).toLocaleDateString('fr-FR')}
+					</span>
+				</div>
+			{/if}
+
+			<!-- Status bar -->
+			<div class="px-6">
+				<StatusBar history={monitor.history} />
+			</div>
+
+			<!-- Graphiques -->
+			<div class="px-6 flex flex-col gap-4">
+				<!-- Tabs -->
+				<div class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
+					<button
+						class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+						${mode === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+						on:click={() => (mode = 0)}
+					>
+						<svg
+							class="w-3.5 h-3.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							viewBox="0 0 24 24"
+						>
+							<polyline
+								points="22 12 18 12 15 21 9 3 6 12 2 12"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+						Latence
+					</button>
+					<button
+						class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+						${mode === 1 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+						on:click={() => (mode = 1)}
+					>
+						<svg
+							class="w-3.5 h-3.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							viewBox="0 0 24 24"
+						>
+							<rect x="3" y="3" width="7" height="7" rx="1" /><rect
+								x="14"
+								y="3"
+								width="7"
+								height="7"
+								rx="1"
+							/><rect x="3" y="14" width="7" height="7" rx="1" /><rect
+								x="14"
+								y="14"
+								width="7"
+								height="7"
+								rx="1"
+							/>
+						</svg>
+						Les deux
+					</button>
+					<button
+						class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+						${mode === 2 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+						on:click={() => (mode = 2)}
+					>
+						<svg
+							class="w-3.5 h-3.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							viewBox="0 0 24 24"
+						>
+							<line x1="8" y1="6" x2="21" y2="6" stroke-linecap="round" /><line
+								x1="8"
+								y1="12"
+								x2="21"
+								y2="12"
+								stroke-linecap="round"
+							/><line x1="8" y1="18" x2="21" y2="18" stroke-linecap="round" /><circle
+								cx="3"
+								cy="6"
+								r="1.5"
+								fill="currentColor"
+							/><circle cx="3" cy="12" r="1.5" fill="currentColor" /><circle
+								cx="3"
+								cy="18"
+								r="1.5"
+								fill="currentColor"
+							/>
+						</svg>
+						Historique
+					</button>
+				</div>
+
+				{#if mode === 0 || mode === 1}
+					<Sparkline
+						values={latencyValues}
+						timestamps={monitor.history
+							.filter((c) => c.latency_ms !== null)
+							.map((c) => c.checked_at)}
+						height={160}
+					/>
+				{/if}
+
+				{#if mode === 1 || mode === 2}
+					<div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
+						{#each [...monitor.history].reverse() as c (c.id)}
+							<div
+								class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+							>
+								{#if c.status === 'up'}
+									<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+								{:else}
+									<span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
+								{/if}
+								<span
+									class={`font-mono font-medium ${c.latency_ms !== null ? latencyColor(c.latency_ms) : 'text-gray-500'}`}
+								>
+									{c.latency_ms !== null ? `${c.latency_ms} ms` : '—'}
+								</span>
+								<span class="ml-auto text-slate-500 font-mono text-[11px]">
+									{toUtcDate(c.checked_at).toLocaleString('fr-FR', {
+										day: '2-digit',
+										month: '2-digit',
+										hour: '2-digit',
+										minute: '2-digit'
+									})}
+								</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			{#if !showConfirmDelete}
+				<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex items-center justify-between">
+					<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
+						<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
+						<span>Créé le : {formatDate(monitor.createdAt)}</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<button class="btn btn-sm btn-primary" on:click={openEdit}> Modifier </button>
+						<button
+							class="btn btn-sm btn-danger disabled:opacity-50"
+							on:click={() => (showConfirmDelete = true)}
+							disabled={deleting}
+						>
+							Supprimer
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex flex-col gap-3">
+					<p class="text-xs text-slate-400">
+						Tape <strong class="text-white">{monitor.name}</strong> pour confirmer la suppression.
+					</p>
+					<input
+						type="text"
+						class="w-full rounded-lg border border-rose-400 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+						bind:value={deleteConfirmText}
+						placeholder={monitor.name}
+						disabled={deleting}
+					/>
+					<div class="flex gap-2 justify-end">
+						<button
+							class="btn btn-sm btn-secondary"
+							on:click={() => {
+								showConfirmDelete = false;
+								deleteConfirmText = '';
+							}}
+							disabled={deleting}
+						>
+							Annuler
+						</button>
+						<button
+							class="btn btn-sm btn-danger disabled:opacity-50"
+							on:click={confirmDelete}
+							disabled={deleting || deleteConfirmText !== monitor.name}
+						>
+							{deleting ? 'Suppression...' : 'Supprimer définitivement'}
+						</button>
+					</div>
+				</div>
+			{/if}
 		{/if}
 		<!-- fin {#if editing} -->
 	</div>

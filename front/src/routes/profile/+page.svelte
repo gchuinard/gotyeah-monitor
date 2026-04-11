@@ -17,12 +17,14 @@
 	let success: string | null = null;
 
 	$: passwordsMatch = confirmPassword === '' || newPassword === confirmPassword;
-	$: passwordError = newPassword && !passwordValid
-		? 'Le mot de passe ne respecte pas les critères.'
-		: newPassword && confirmPassword && !passwordsMatch
-		? 'Les mots de passe ne correspondent pas.'
-		: null;
-	$: canSubmit = !submitting && (!newPassword || (passwordValid && newPassword === confirmPassword));
+	$: passwordError =
+		newPassword && !passwordValid
+			? 'Le mot de passe ne respecte pas les critères.'
+			: newPassword && confirmPassword && !passwordsMatch
+				? 'Les mots de passe ne correspondent pas.'
+				: null;
+	$: canSubmit =
+		!submitting && (!newPassword || (passwordValid && newPassword === confirmPassword));
 
 	onMount(() => {
 		state = get(auth);
@@ -149,7 +151,9 @@
 			{/if}
 
 			{#if success}
-				<div class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+				<div
+					class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2"
+				>
 					{success}
 				</div>
 			{/if}

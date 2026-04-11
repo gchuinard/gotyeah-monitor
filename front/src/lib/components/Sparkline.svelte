@@ -53,7 +53,10 @@
 			const ts = timestamps[idx];
 			if (!ts) return null;
 			const d = new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
-			return { x: pts[idx].x, label: d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
+			return {
+				x: pts[idx].x,
+				label: d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+			};
 		}).filter(Boolean) as { x: number; label: string }[];
 	})();
 
@@ -77,11 +80,16 @@
 		let bestDist = Infinity;
 		for (let i = 0; i < pts.length; i++) {
 			const d = Math.abs(pts[i].x - svgX);
-			if (d < bestDist) { bestDist = d; best = i; }
+			if (d < bestDist) {
+				bestDist = d;
+				best = i;
+			}
 		}
 
 		const p = pts[best];
-		const ts = p.ts ? toUtcDate(p.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+		const ts = p.ts
+			? toUtcDate(p.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+			: '';
 		hovered = { x: p.x, y: p.y, v: p.v, label: ts };
 	}
 
@@ -117,54 +125,122 @@
 
 	<!-- Grille Y -->
 	{#each gridLines as gl}
-		<line x1={pad.left} y1={gl.y} x2={VW - pad.right} y2={gl.y}
-			stroke="rgba(148,163,184,0.12)" stroke-width="1" stroke-dasharray="4 4" />
-		<text x={pad.left - 7} y={gl.y + 4} text-anchor="end"
-			fill="rgba(148,163,184,0.45)" font-size="10" font-family="monospace">{gl.label}</text>
+		<line
+			x1={pad.left}
+			y1={gl.y}
+			x2={VW - pad.right}
+			y2={gl.y}
+			stroke="rgba(148,163,184,0.12)"
+			stroke-width="1"
+			stroke-dasharray="4 4"
+		/>
+		<text
+			x={pad.left - 7}
+			y={gl.y + 4}
+			text-anchor="end"
+			fill="rgba(148,163,184,0.45)"
+			font-size="10"
+			font-family="monospace">{gl.label}</text
+		>
 	{/each}
 
 	<!-- Baseline -->
-	<line x1={pad.left} y1={baseline} x2={VW - pad.right} y2={baseline}
-		stroke="rgba(148,163,184,0.2)" stroke-width="1" />
+	<line
+		x1={pad.left}
+		y1={baseline}
+		x2={VW - pad.right}
+		y2={baseline}
+		stroke="rgba(148,163,184,0.2)"
+		stroke-width="1"
+	/>
 
 	<!-- Labels Y min/max -->
-	<text x={pad.left - 7} y={pad.top + 4} text-anchor="end"
-		fill="rgba(148,163,184,0.45)" font-size="10" font-family="monospace">{max}</text>
-	<text x={pad.left - 7} y={baseline + 1} text-anchor="end"
-		fill="rgba(148,163,184,0.45)" font-size="10" font-family="monospace">{min}</text>
+	<text
+		x={pad.left - 7}
+		y={pad.top + 4}
+		text-anchor="end"
+		fill="rgba(148,163,184,0.45)"
+		font-size="10"
+		font-family="monospace">{max}</text
+	>
+	<text
+		x={pad.left - 7}
+		y={baseline + 1}
+		text-anchor="end"
+		fill="rgba(148,163,184,0.45)"
+		font-size="10"
+		font-family="monospace">{min}</text
+	>
 
 	<!-- Unité ms -->
-	<text x={VW - pad.right} y={pad.top - 2} text-anchor="end"
-		fill="rgba(148,163,184,0.3)" font-size="9" font-family="monospace">ms</text>
+	<text
+		x={VW - pad.right}
+		y={pad.top - 2}
+		text-anchor="end"
+		fill="rgba(148,163,184,0.3)"
+		font-size="9"
+		font-family="monospace">ms</text
+	>
 
 	<!-- Labels X heure -->
 	{#each xLabels as xl}
-		<line x1={xl.x} y1={baseline} x2={xl.x} y2={baseline + 4}
-			stroke="rgba(148,163,184,0.2)" stroke-width="1" />
-		<text x={xl.x} y={baseline + 14} text-anchor="middle"
-			fill="rgba(148,163,184,0.45)" font-size="9" font-family="monospace">{xl.label}</text>
+		<line
+			x1={xl.x}
+			y1={baseline}
+			x2={xl.x}
+			y2={baseline + 4}
+			stroke="rgba(148,163,184,0.2)"
+			stroke-width="1"
+		/>
+		<text
+			x={xl.x}
+			y={baseline + 14}
+			text-anchor="middle"
+			fill="rgba(148,163,184,0.45)"
+			font-size="9"
+			font-family="monospace">{xl.label}</text
+		>
 	{/each}
 
 	{#if pts.length >= 2}
 		<path d={areaPath} fill="url(#{gradId})" />
-		<path d={linePath} fill="none" stroke={lineColor} stroke-width="2"
-			stroke-linecap="round" stroke-linejoin="round" />
+		<path
+			d={linePath}
+			fill="none"
+			stroke={lineColor}
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
 		<circle cx={pts[0].x} cy={pts[0].y} r="2.5" fill={lineColor} opacity="0.5" />
-		<circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="4" fill={lineColor} opacity="0.15" />
+		<circle
+			cx={pts[pts.length - 1].x}
+			cy={pts[pts.length - 1].y}
+			r="4"
+			fill={lineColor}
+			opacity="0.15"
+		/>
 		<circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="2.5" fill={lineColor} />
 	{:else if pts.length === 1}
 		<circle cx={pts[0].x} cy={pts[0].y} r="3" fill={lineColor} />
 	{:else}
-		<text x={VW / 2} y={height / 2 + 4} text-anchor="middle"
-			fill="rgba(148,163,184,0.3)" font-size="12">Pas encore de données</text>
+		<text
+			x={VW / 2}
+			y={height / 2 + 4}
+			text-anchor="middle"
+			fill="rgba(148,163,184,0.3)"
+			font-size="12">Pas encore de données</text
+		>
 	{/if}
 
 	<!-- ── Hover overlay ─────────────────────────────────────────── -->
 	{#if hovered}
 		<!-- Ligne verticale -->
 		<line
-			x1={hovered.x} y1={pad.top}
-			x2={hovered.x} y2={baseline}
+			x1={hovered.x}
+			y1={pad.top}
+			x2={hovered.x}
+			y2={baseline}
 			stroke="rgba(148,163,184,0.35)"
 			stroke-width="1"
 			stroke-dasharray="3 3"
@@ -177,12 +253,28 @@
 		<!-- Tooltip -->
 		{@const tx = tooltipX(hovered.x)}
 		{@const ty = Math.max(pad.top, hovered.y - 36)}
-		<rect x={tx} y={ty} width="90" height="26" rx="5"
-			fill="#1e293b" fill-opacity="0.75" stroke="rgba(148,163,184,0.2)" stroke-width="1" />
+		<rect
+			x={tx}
+			y={ty}
+			width="90"
+			height="26"
+			rx="5"
+			fill="#1e293b"
+			fill-opacity="0.75"
+			stroke="rgba(148,163,184,0.2)"
+			stroke-width="1"
+		/>
 		<text x={tx + 8} y={ty + 10} fill="rgba(148,163,184,0.6)" font-size="9" font-family="monospace">
 			{hovered.label}
 		</text>
-		<text x={tx + 8} y={ty + 21} fill={lineColor} font-size="10" font-weight="600" font-family="monospace">
+		<text
+			x={tx + 8}
+			y={ty + 21}
+			fill={lineColor}
+			font-size="10"
+			font-weight="600"
+			font-family="monospace"
+		>
 			{hovered.v} ms
 		</text>
 	{/if}

@@ -46,23 +46,39 @@
 		{#if pageStatus === 'loading'}
 			<p class="text-sm text-slate-500">Vérification en cours…</p>
 		{:else if pageStatus === 'success'}
-			<div class="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-4">
-				<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+			<div
+				class="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-4"
+			>
+				<svg
+					class="w-4 h-4 shrink-0"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					viewBox="0 0 24 24"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 				</svg>
 				{message}
 			</div>
-			<button
-				type="button"
-				class="btn btn-md btn-primary w-full"
-				on:click={() => goto('/login')}
-			>
+			<button type="button" class="btn btn-md btn-primary w-full" on:click={() => goto('/login')}>
 				Se connecter
 			</button>
 		{:else}
-			<div class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
-				<svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+			<div
+				class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4"
+			>
+				<svg
+					class="w-4 h-4 shrink-0 mt-0.5"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+					/>
 				</svg>
 				{message}
 			</div>
