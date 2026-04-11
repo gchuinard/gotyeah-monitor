@@ -105,11 +105,19 @@
 			</button>
 		</form>
 
-		<div class="mt-4 text-xs text-slate-500">
-			Pas encore de compte ?
-			<button type="button" class="text-cyan-600 hover:text-cyan-500 underline" on:click={() => goto('/register')}>
-				Créer un compte
-			</button>
+		<div class="mt-4 flex flex-col gap-2 text-xs text-slate-500">
+			<div>
+				Mot de passe oublié ?
+				<button type="button" class="text-cyan-600 hover:text-cyan-500 underline" on:click={() => goto('/forgot-password')}>
+					Réinitialiser
+				</button>
+			</div>
+			<div>
+				Pas encore de compte ?
+				<button type="button" class="text-cyan-600 hover:text-cyan-500 underline" on:click={() => goto('/register')}>
+					Créer un compte
+				</button>
+			</div>
 		</div>
 	</div>
 </div>

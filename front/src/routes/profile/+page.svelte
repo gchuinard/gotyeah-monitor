@@ -3,15 +3,26 @@
 	import { onMount } from 'svelte';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { get } from 'svelte/store';
+	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 
 	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 	let state: AuthState = { token: null, user: null };
 	let email = '';
 	let newPassword = '';
+	let confirmPassword = '';
+	let passwordValid = false;
 	let submitting = false;
 	let error: string | null = null;
 	let success: string | null = null;
+
+	$: passwordsMatch = confirmPassword === '' || newPassword === confirmPassword;
+	$: passwordError = newPassword && !passwordValid
+		? 'Le mot de passe ne respecte pas les critères.'
+		: newPassword && confirmPassword && !passwordsMatch
+		? 'Les mots de passe ne correspondent pas.'
+		: null;
+	$: canSubmit = !submitting && (!newPassword || (passwordValid && newPassword === confirmPassword));
 
 	onMount(() => {
 		state = get(auth);
@@ -22,6 +33,7 @@
 	});
 
 	async function onSubmit() {
+		if (!canSubmit) return;
 		submitting = true;
 		error = null;
 		success = null;
@@ -54,6 +66,7 @@
 			auth.set(state);
 			success = 'Profil mis à jour.';
 			newPassword = '';
+			confirmPassword = '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Erreur inconnue';
 		} finally {
@@ -97,15 +110,37 @@
 				/>
 			</label>
 
-			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600">Nouveau mot de passe</span>
-				<input
-					type="password"
-					class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-					bind:value={newPassword}
-					placeholder="Laisser vide pour ne pas changer"
-				/>
-			</label>
+			<div class="flex flex-col gap-1">
+				<label class="flex flex-col gap-1">
+					<span class="text-sm text-slate-600">Nouveau mot de passe</span>
+					<input
+						type="password"
+						class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+						bind:value={newPassword}
+						placeholder="Laisser vide pour ne pas changer"
+					/>
+				</label>
+				<PasswordStrength password={newPassword} bind:valid={passwordValid} />
+			</div>
+
+			{#if newPassword}
+				<div class="flex flex-col gap-1">
+					<label class="flex flex-col gap-1">
+						<span class="text-sm text-slate-600">Confirmer le mot de passe</span>
+						<input
+							type="password"
+							class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60
+								{confirmPassword && !passwordsMatch ? 'border-rose-400 ring-2 ring-rose-200' : ''}"
+							bind:value={confirmPassword}
+						/>
+					</label>
+					{#if confirmPassword && !passwordsMatch}
+						<p class="text-xs text-rose-500">Les mots de passe ne correspondent pas.</p>
+					{:else if confirmPassword && passwordsMatch}
+						<p class="text-xs text-emerald-600">Les mots de passe correspondent.</p>
+					{/if}
+				</div>
+			{/if}
 
 			{#if error}
 				<div class="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
@@ -114,9 +149,7 @@
 			{/if}
 
 			{#if success}
-				<div
-					class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2"
-				>
+				<div class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
 					{success}
 				</div>
 			{/if}
@@ -124,7 +157,7 @@
 			<button
 				type="submit"
 				class="btn btn-md btn-primary mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-				disabled={submitting}
+				disabled={!canSubmit}
 			>
 				{submitting ? 'Enregistrement...' : 'Enregistrer'}
 			</button>

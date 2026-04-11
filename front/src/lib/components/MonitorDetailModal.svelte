@@ -13,6 +13,7 @@
 	let mode = 1;
 	let deleting = false;
 	let showConfirmDelete = false;
+	let deleteConfirmText = '';
 
 	// ── Mode édition ───────────────────────────────────────────────────────
 	let editing = false;
@@ -364,13 +365,13 @@
 		</div>
 
 		<!-- Footer -->
-		<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex items-center justify-between">
-			<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
-				<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
-				<span>Créé le : {formatDate(monitor.createdAt)}</span>
-			</div>
-			<div class="flex items-center gap-2">
-				{#if !showConfirmDelete}
+		{#if !showConfirmDelete}
+			<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex items-center justify-between">
+				<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
+					<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
+					<span>Créé le : {formatDate(monitor.createdAt)}</span>
+				</div>
+				<div class="flex items-center gap-2">
 					<button class="btn btn-sm btn-primary" on:click={openEdit}>
 						Modifier
 					</button>
@@ -381,19 +382,30 @@
 					>
 						Supprimer
 					</button>
-				{:else}
-					<span class="text-[11px] text-slate-400 mr-1">
-						Supprimer <span class="text-gotyeah-300 font-semibold">"{monitor.name}"</span> ?
-					</span>
-					<button class="btn btn-sm btn-secondary" on:click={() => (showConfirmDelete = false)} disabled={deleting}>
+				</div>
+			</div>
+		{:else}
+			<div class="px-6 pb-5 border-t border-slate-800 pt-4 flex flex-col gap-3">
+				<p class="text-xs text-slate-400">
+					Tape <strong class="text-white">{monitor.name}</strong> pour confirmer la suppression.
+				</p>
+				<input
+					type="text"
+					class="w-full rounded-lg border border-rose-400 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+					bind:value={deleteConfirmText}
+					placeholder={monitor.name}
+					disabled={deleting}
+				/>
+				<div class="flex gap-2 justify-end">
+					<button class="btn btn-sm btn-secondary" on:click={() => { showConfirmDelete = false; deleteConfirmText = ''; }} disabled={deleting}>
 						Annuler
 					</button>
-					<button class="btn btn-sm btn-danger disabled:opacity-50" on:click={confirmDelete} disabled={deleting}>
-						{deleting ? 'Oui…' : 'Confirmer'}
+					<button class="btn btn-sm btn-danger disabled:opacity-50" on:click={confirmDelete} disabled={deleting || deleteConfirmText !== monitor.name}>
+						{deleting ? 'Suppression...' : 'Supprimer définitivement'}
 					</button>
-				{/if}
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		{/if}
 		<!-- fin {#if editing} -->

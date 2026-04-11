@@ -6,5 +6,11 @@ export default defineConfig({
 	preview: {
 		allowedHosts: ['monitor.gautierchuinard.com']
 	},
-	plugins: [tailwindcss(), sveltekit()]
+	plugins: [tailwindcss(), sveltekit()],
+	server: {
+		watch: {
+			usePolling: true,
+			interval: 300
+		}
+	}
 });

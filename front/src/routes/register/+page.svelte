@@ -26,7 +26,6 @@
 			}
 
 			success = true;
-			setTimeout(() => goto('/login'), 1500);
 		} catch (e) {
 			error = parseNetworkError(e, 'register');
 		} finally {
@@ -81,7 +80,7 @@
 					<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
 					</svg>
-					Compte créé ! Redirection vers la connexion...
+					Compte créé ! Vérifiez votre email pour activer votre compte.
 				</div>
 			{/if}
 

@@ -4,6 +4,7 @@
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
+	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 	import { onMount } from 'svelte';
 	import { goto, preloadCode } from '$app/navigation';
 
@@ -79,21 +80,65 @@
 
 	// Profil modal
 	let showProfile = false;
-	let profileEmail = '';
-	let profilePassword = '';
-	let profileSubmitting = false;
-	let profileError: string | null = null;
-	let profileSuccess: string | null = null;
 	let profileConfirmDelete = false;
 	let profileDeleting = false;
+	let profileDeleteConfirmText = '';
+
+	// Email change
+	let profileNewEmail = '';
+	let profileEmailSubmitting = false;
+	let profileEmailError: string | null = null;
+	let profileEmailSuccess: string | null = null;
+
+	// Password change
+	let profilePassword = '';
+	let profileConfirmPassword = '';
+	let profilePasswordValid = false;
+	let profilePasswordSubmitting = false;
+	let profilePasswordError: string | null = null;
+	let profilePasswordSuccess: string | null = null;
+
+	$: profilePasswordsMatch = profileConfirmPassword === '' || profilePassword === profileConfirmPassword;
+	$: profileCanSavePassword = !profilePasswordSubmitting && profilePassword !== '' && profilePasswordValid && profilePassword === profileConfirmPassword;
 
 	function openProfile() {
-		profileEmail = authState?.user?.email ?? '';
+		profileNewEmail = '';
+		profileEmailError = null;
+		profileEmailSuccess = null;
 		profilePassword = '';
-		profileError = null;
-		profileSuccess = null;
+		profileConfirmPassword = '';
+		profilePasswordError = null;
+		profilePasswordSuccess = null;
 		profileConfirmDelete = false;
+		profileDeleteConfirmText = '';
 		showProfile = true;
+	}
+
+	async function submitEmailChange() {
+		profileEmailSubmitting = true;
+		profileEmailError = null;
+		profileEmailSuccess = null;
+		try {
+			const res = await fetch(`${API_URL}/auth/change-email`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${authState.token}`
+				},
+				body: JSON.stringify({ new_email: profileNewEmail })
+			});
+			const data = await res.json();
+			if (!res.ok) {
+				profileEmailError = data.detail || 'Erreur lors de la demande.';
+			} else {
+				profileEmailSuccess = data.message;
+				profileNewEmail = '';
+			}
+		} catch {
+			profileEmailError = 'Impossible de contacter le serveur.';
+		} finally {
+			profileEmailSubmitting = false;
+		}
 	}
 
 	async function deleteAccount() {
@@ -107,40 +152,35 @@
 			clearAuth();
 			goto('/login');
 		} catch (e) {
-			profileError = e instanceof Error ? e.message : 'Erreur inconnue';
+			profilePasswordError = e instanceof Error ? e.message : 'Erreur inconnue';
 			profileDeleting = false;
 			profileConfirmDelete = false;
 		}
 	}
 
-	async function saveProfile() {
-		profileSubmitting = true;
-		profileError = null;
-		profileSuccess = null;
+	async function savePassword() {
+		profilePasswordSubmitting = true;
+		profilePasswordError = null;
+		profilePasswordSuccess = null;
 		try {
-			const payload: { email?: string; password?: string } = {};
-			if (profileEmail && profileEmail !== authState.user?.email) payload.email = profileEmail;
-			if (profilePassword) payload.password = profilePassword;
-
 			const res = await fetch(`${API_URL}/auth/me`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${authState.token}`
 				},
-				body: JSON.stringify(payload)
+				body: JSON.stringify({ password: profilePassword })
 			});
 
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
 
-			const me = await res.json();
-			auth.set({ token: authState.token, user: { id: me.id, email: me.email } });
-			profileSuccess = 'Profil mis à jour.';
+			profilePasswordSuccess = 'Mot de passe mis à jour.';
 			profilePassword = '';
+			profileConfirmPassword = '';
 		} catch (e) {
-			profileError = e instanceof Error ? e.message : 'Erreur inconnue';
+			profilePasswordError = e instanceof Error ? e.message : 'Erreur inconnue';
 		} finally {
-			profileSubmitting = false;
+			profilePasswordSubmitting = false;
 		}
 	}
 
@@ -359,21 +399,48 @@
 			</div>
 		{/if}
 
-		<div
-			class={viewMode === 'grid'
-				? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 items-start'
-				: 'flex flex-col gap-4 p-8'}
-		>
-			{#each $monitors as m (m.id)}
-				<MonitorCard
-					{...m}
-					showDetails={openCardId === m.id}
-					onToggleDetails={() => toggleCardDetails(m.id)}
-					onDeleted={fetchMonitors}
-					compact={viewMode === 'list'}
-				/>
-			{/each}
-		</div>
+		{#if !loading && $monitors.length === 0}
+			<div class="flex flex-col items-center justify-center gap-5 py-20 px-8 text-center">
+				<div class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800">
+					<svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"/>
+					</svg>
+				</div>
+				<div class="flex flex-col gap-1">
+					<p class="text-base font-semibold text-slate-800 dark:text-slate-100">Aucun moniteur pour l'instant</p>
+					<p class="text-sm text-slate-400 dark:text-slate-500 max-w-xs">Ajoutez votre premier site ou service à surveiller pour commencer.</p>
+				</div>
+				<button
+					type="button"
+					class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold
+						   bg-cyan-500 hover:bg-cyan-400 text-white
+						   shadow-[0_0_24px_rgba(34,211,238,0.45)] hover:shadow-[0_0_32px_rgba(34,211,238,0.65)]
+						   transition-all"
+					on:click={openAdd}
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+					</svg>
+					Ajouter un moniteur
+				</button>
+			</div>
+		{:else}
+			<div
+				class={viewMode === 'grid'
+					? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 items-start'
+					: 'flex flex-col gap-4 p-8'}
+			>
+				{#each $monitors as m (m.id)}
+					<MonitorCard
+						{...m}
+						showDetails={openCardId === m.id}
+						onToggleDetails={() => toggleCardDetails(m.id)}
+						onDeleted={fetchMonitors}
+						compact={viewMode === 'list'}
+					/>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -475,12 +542,12 @@
 
 {#if showProfile}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40"
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40 px-4"
 		on:click={() => (showProfile = false)}
 		role="presentation"
 	>
 		<div
-			class="w-full max-w-sm mx-4 rounded-2xl overflow-hidden
+			class="w-full max-w-sm rounded-2xl overflow-hidden
                    bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
                    shadow-[0_0_60px_rgba(56,189,248,0.25)]"
@@ -488,76 +555,138 @@
 			role="dialog"
 			aria-modal="true"
 		>
-			<!-- Header avec dégradé -->
-			<div class="relative bg-gradient-to-br from-cyan-500 to-cyan-700 px-6 pt-6 pb-10">
-				<button
-					type="button"
-					class="absolute top-4 right-4 h-7 w-7 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-					on:click={() => (showProfile = false)}
-				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-					</svg>
-				</button>
-				<div class="flex items-center gap-4">
-					<span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white font-bold text-2xl shadow-lg backdrop-blur-sm border border-white/30">
-						{authState?.user?.email?.[0]?.toUpperCase() ?? '?'}
-					</span>
-					<div class="flex flex-col gap-0.5">
-						<span class="font-semibold text-white text-base leading-tight">Mon profil</span>
-						<span class="text-xs text-cyan-100 truncate max-w-[180px]">{authState?.user?.email}</span>
-						<span class="text-[10px] text-cyan-200/70 mt-0.5">{$monitors.length} moniteur{$monitors.length !== 1 ? 's' : ''}</span>
-					</div>
-				</div>
-			</div>
-
 			<!-- Body -->
-			<div class="px-6 pb-6 -mt-5 flex flex-col gap-4">
-				<!-- Form card -->
+			<div class="px-5 pb-5 pt-5 flex flex-col gap-3 max-h-[80vh] overflow-y-auto">
+				<div class="flex items-center justify-between mb-1">
+					<h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Mon profil</h2>
+					<button
+						type="button"
+						class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+						on:click={() => (showProfile = false)}
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+						</svg>
+					</button>
+				</div>
+
+				<!-- Changer l'adresse email -->
 				<form
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
-					on:submit|preventDefault={saveProfile}
+					on:submit|preventDefault={submitEmailChange}
 				>
-					<p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modifier le compte</p>
+					<p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Adresse email</p>
+
 					<label class="flex flex-col gap-1">
-						<span class="text-xs text-slate-500 dark:text-slate-400">Email</span>
+						<span class="text-xs text-slate-500 dark:text-slate-400">Email actuel</span>
+						<input
+							type="email"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 px-3 py-2 text-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
+							value={authState?.user?.email ?? ''}
+							disabled
+						/>
+					</label>
+
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Nouvelle adresse email</span>
 						<input
 							type="email"
 							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={profileEmail}
+							bind:value={profileNewEmail}
+							placeholder="nouvelle@adresse.com"
 							required
 						/>
 					</label>
-					<label class="flex flex-col gap-1">
-						<span class="text-xs text-slate-500 dark:text-slate-400">Nouveau mot de passe</span>
-						<input
-							type="password"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={profilePassword}
-							placeholder="Laisser vide pour ne pas changer"
-						/>
-					</label>
 
-					{#if profileError}
-						<p class="text-xs text-rose-500 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">{profileError}</p>
+					{#if profileEmailError}
+						<div class="flex items-start gap-2 text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
+							<svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+							</svg>
+							{profileEmailError}
+						</div>
 					{/if}
-					{#if profileSuccess}
-						<p class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">{profileSuccess}</p>
+					{#if profileEmailSuccess}
+						<div class="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">
+							<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+							</svg>
+							{profileEmailSuccess}
+						</div>
 					{/if}
 
-					<div class="flex gap-2 justify-end pt-1">
-						<button type="button" class="btn btn-sm btn-secondary" on:click={() => (showProfile = false)}>
-							Annuler
+					<div class="flex justify-end pt-1">
+						<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={profileEmailSubmitting || !profileNewEmail}>
+							{profileEmailSubmitting ? 'Envoi...' : 'Envoyer le lien de confirmation'}
 						</button>
-						<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={profileSubmitting}>
-							{profileSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+					</div>
+				</form>
+
+				<!-- Changer le mot de passe -->
+				<form
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+					on:submit|preventDefault={savePassword}
+				>
+					<p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Mot de passe</p>
+
+					<div class="flex flex-col gap-1">
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-500 dark:text-slate-400">Nouveau mot de passe</span>
+							<input
+								type="password"
+								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								bind:value={profilePassword}
+								placeholder="Nouveau mot de passe"
+							/>
+						</label>
+						<PasswordStrength password={profilePassword} bind:valid={profilePasswordValid} />
+					</div>
+
+					<div class="flex flex-col gap-1">
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-500 dark:text-slate-400">Confirmer le mot de passe</span>
+							<input
+								type="password"
+								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500
+									{profileConfirmPassword && !profilePasswordsMatch ? 'border-rose-400 ring-2 ring-rose-200' : ''}"
+								bind:value={profileConfirmPassword}
+								placeholder="Répétez le mot de passe"
+							/>
+						</label>
+						{#if profileConfirmPassword && !profilePasswordsMatch}
+							<p class="text-xs text-rose-500">Les mots de passe ne correspondent pas.</p>
+						{:else if profileConfirmPassword && profilePasswordsMatch}
+							<p class="text-xs text-emerald-600">Les mots de passe correspondent.</p>
+						{/if}
+					</div>
+
+					{#if profilePasswordError}
+						<div class="flex items-start gap-2 text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">
+							<svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+							</svg>
+							{profilePasswordError}
+						</div>
+					{/if}
+					{#if profilePasswordSuccess}
+						<div class="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">
+							<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+							</svg>
+							{profilePasswordSuccess}
+						</div>
+					{/if}
+
+					<div class="flex justify-end pt-1">
+						<button type="submit" class="btn btn-sm btn-primary disabled:opacity-50" disabled={!profileCanSavePassword}>
+							{profilePasswordSubmitting ? 'Enregistrement...' : 'Mettre à jour'}
 						</button>
 					</div>
 				</form>
 
 				<!-- Zone de danger -->
-				<div class="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 p-4 flex flex-col gap-2">
-					<p class="text-[11px] font-semibold uppercase tracking-wider text-rose-400">Zone de danger</p>
+				<div class="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/30 p-4 flex flex-col gap-2">
+					<p class="text-[10px] font-semibold uppercase tracking-widest text-rose-400">Zone de danger</p>
 					{#if !profileConfirmDelete}
 						<button
 							type="button"
@@ -570,17 +699,28 @@
 							Supprimer mon compte
 						</button>
 					{:else}
-						<p class="text-xs text-rose-500">Tous tes moniteurs seront supprimés. Cette action est irréversible.</p>
-						<div class="flex gap-2 justify-end">
-							<button type="button" class="btn btn-sm btn-secondary" on:click={() => (profileConfirmDelete = false)} disabled={profileDeleting}>
+						<p class="text-xs text-rose-500 mb-2">Tous tes moniteurs seront supprimés. Cette action est irréversible.</p>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-rose-400">Tape <strong>supprimer</strong> pour confirmer</span>
+							<input
+								type="text"
+								class="rounded-lg border border-rose-300 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+								bind:value={profileDeleteConfirmText}
+								placeholder="supprimer"
+								disabled={profileDeleting}
+							/>
+						</label>
+						<div class="flex gap-2 justify-end mt-1">
+							<button type="button" class="btn btn-sm btn-secondary" on:click={() => { profileConfirmDelete = false; profileDeleteConfirmText = ''; }} disabled={profileDeleting}>
 								Annuler
 							</button>
-							<button type="button" class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50" on:click={deleteAccount} disabled={profileDeleting}>
-								{profileDeleting ? 'Suppression...' : 'Confirmer'}
+							<button type="button" class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50" on:click={deleteAccount} disabled={profileDeleting || profileDeleteConfirmText !== 'supprimer'}>
+								{profileDeleting ? 'Suppression...' : 'Supprimer'}
 							</button>
 						</div>
 					{/if}
 				</div>
+
 			</div>
 		</div>
 	</div>

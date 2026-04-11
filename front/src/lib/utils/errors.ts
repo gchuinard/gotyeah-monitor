@@ -22,7 +22,7 @@ export async function parseApiError(res: Response, context: string): Promise<str
 		if (context === 'login') return 'Email ou mot de passe incorrect.';
 		return 'Session expirée. Reconnectez-vous.';
 	}
-	if (res.status === 403) return 'Accès refusé.';
+	if (res.status === 403) return detail || 'Accès refusé.';
 	if (res.status === 404) return `Ressource introuvable (${context}).`;
 	if (res.status === 409 || (detail && detail.toLowerCase().includes('already exist'))) {
 		return 'Cet email est déjà utilisé.';

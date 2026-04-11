@@ -35,6 +35,7 @@
 		| { kind: 'user'; userId: number; userEmail: string };
 
 	let confirmModal: ConfirmModal | null = null;
+	let confirmText = '';
 
 	type EditModal = {
 		monitorId: number;
@@ -80,10 +81,12 @@
 
 	function askDelete(monitor: Monitor, userEmail: string) {
 		confirmModal = { kind: 'monitor', monitorId: monitor.id, monitorName: monitor.name, userEmail };
+		confirmText = '';
 	}
 
 	function askDeleteUser(user: UserWithMonitors) {
 		confirmModal = { kind: 'user', userId: user.id, userEmail: user.email };
+		confirmText = '';
 	}
 
 	function openEdit(monitor: Monitor, userId: number) {
@@ -447,9 +450,9 @@
 			role="dialog"
 			aria-modal="true"
 		>
-			<div class="flex flex-col gap-2">
+			<div class="flex flex-col gap-3">
 				<div class="flex items-center gap-3">
-					<span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40">
+					<span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/40 shrink-0">
 						<svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 						</svg>
@@ -466,19 +469,35 @@
 					{/if}
 					Cette action est irréversible.
 				</p>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-500 dark:text-slate-400">
+						{#if confirmModal.kind === 'monitor'}
+							Tape <strong class="text-slate-700 dark:text-slate-200">{confirmModal.monitorName}</strong> pour confirmer
+						{:else}
+							Tape <strong class="text-slate-700 dark:text-slate-200">supprimer</strong> pour confirmer
+						{/if}
+					</span>
+					<input
+						type="text"
+						class="rounded-lg border border-rose-300 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+						bind:value={confirmText}
+						placeholder={confirmModal.kind === 'monitor' ? confirmModal.monitorName : 'supprimer'}
+					/>
+				</label>
 			</div>
 			<div class="flex gap-3 justify-end">
 				<button
 					type="button"
 					class="btn btn-sm btn-secondary"
-					on:click={() => (confirmModal = null)}
+					on:click={() => { confirmModal = null; confirmText = ''; }}
 				>
 					Annuler
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent"
+					class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50"
 					on:click={confirmDelete}
+					disabled={confirmModal.kind === 'monitor' ? confirmText !== confirmModal.monitorName : confirmText !== 'supprimer'}
 				>
 					Supprimer
 				</button>

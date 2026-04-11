@@ -11,11 +11,15 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
+    is_verified = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     monitors = relationship("Monitor", back_populates="user")
+    email_verifications = relationship("EmailVerification", back_populates="user", cascade="all, delete-orphan")
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+    email_change_requests = relationship("EmailChangeRequest", back_populates="user", cascade="all, delete-orphan")
 
 
 class Monitor(Base):
@@ -62,3 +66,43 @@ class MonitorCheck(Base):
     checked_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
     monitor = relationship("Monitor", back_populates="checks")
+
+
+class EmailVerification(Base):
+    __tablename__ = "email_verifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="email_verifications")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="password_reset_tokens")
+
+
+class EmailChangeRequest(Base):
+    __tablename__ = "email_change_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    old_email = Column(String(255), nullable=False)
+    new_email = Column(String(255), nullable=False)
+    confirm_token = Column(String(64), nullable=False, unique=True, index=True)
+    cancel_token = Column(String(64), nullable=False, unique=True, index=True)
+    confirmed = Column(Boolean, nullable=False, default=False, server_default="0")
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="email_change_requests")
