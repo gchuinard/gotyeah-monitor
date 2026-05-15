@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, type Writable } from 'svelte/store';
 
 export type HistoryWindowPreset = { value: number; label: string };
 
@@ -16,21 +16,50 @@ export const HISTORY_WINDOW_PRESETS: HistoryWindowPreset[] = [
 
 const STORAGE_KEY = 'historyWindowHours';
 const DEFAULT_HOURS = 2;
-const VALID_VALUES = HISTORY_WINDOW_PRESETS.map((p) => p.value);
+const VALID_VALUES = new Set(HISTORY_WINDOW_PRESETS.map((p) => p.value));
 
-function getInitial(): number {
-	if (typeof window === 'undefined') return DEFAULT_HOURS;
+type WindowMap = Record<string, number>;
+
+function load(): WindowMap {
+	if (typeof window === 'undefined') return {};
 	const raw = window.localStorage.getItem(STORAGE_KEY);
-	if (raw === null) return DEFAULT_HOURS;
-	const parsed = Number.parseInt(raw, 10);
-	if (!Number.isFinite(parsed) || !VALID_VALUES.includes(parsed)) return DEFAULT_HOURS;
-	return parsed;
+	if (!raw) return {};
+	try {
+		const parsed = JSON.parse(raw);
+		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+		const out: WindowMap = {};
+		for (const [k, v] of Object.entries(parsed)) {
+			if (typeof v === 'number' && VALID_VALUES.has(v)) out[k] = v;
+		}
+		return out;
+	} catch {
+		return {};
+	}
 }
 
-export const historyWindowHours = writable<number>(getInitial());
+const windowMap = writable<WindowMap>(load());
 
 if (typeof window !== 'undefined') {
-	historyWindowHours.subscribe((value) => {
-		window.localStorage.setItem(STORAGE_KEY, String(value));
+	windowMap.subscribe((value) => {
+		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
 	});
+}
+
+export function monitorWindowStore(monitorId: number | string): Writable<number> {
+	const key = String(monitorId);
+	return {
+		subscribe: (run, invalidate) =>
+			windowMap.subscribe((m) => run(m[key] ?? DEFAULT_HOURS), invalidate),
+		set: (value: number) => {
+			if (!VALID_VALUES.has(value)) return;
+			windowMap.update((m) => ({ ...m, [key]: value }));
+		},
+		update: (updater) => {
+			windowMap.update((m) => {
+				const next = updater(m[key] ?? DEFAULT_HOURS);
+				if (!VALID_VALUES.has(next)) return m;
+				return { ...m, [key]: next };
+			});
+		}
+	};
 }

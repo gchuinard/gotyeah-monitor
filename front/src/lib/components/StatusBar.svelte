@@ -1,27 +1,30 @@
 <script lang="ts">
 	import type { CheckEntry } from '$lib/stores/monitors';
-	import { HISTORY_WINDOW_PRESETS, historyWindowHours } from '$lib/stores/historyWindow';
+	import { HISTORY_WINDOW_PRESETS, monitorWindowStore } from '$lib/stores/historyWindow';
 
 	export let history: CheckEntry[] = [];
+	export let monitorId: number;
+
+	const windowStore = monitorWindowStore(monitorId);
 
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
-	$: currentIdx = HISTORY_WINDOW_PRESETS.findIndex((p) => p.value === $historyWindowHours);
+	$: currentIdx = HISTORY_WINDOW_PRESETS.findIndex((p) => p.value === $windowStore);
 	$: atMin = currentIdx <= 0;
 	$: atMax = currentIdx >= HISTORY_WINDOW_PRESETS.length - 1;
 
 	function stepDown() {
-		if (currentIdx > 0) historyWindowHours.set(HISTORY_WINDOW_PRESETS[currentIdx - 1].value);
+		if (currentIdx > 0) windowStore.set(HISTORY_WINDOW_PRESETS[currentIdx - 1].value);
 	}
 	function stepUp() {
 		if (currentIdx >= 0 && currentIdx < HISTORY_WINDOW_PRESETS.length - 1)
-			historyWindowHours.set(HISTORY_WINDOW_PRESETS[currentIdx + 1].value);
+			windowStore.set(HISTORY_WINDOW_PRESETS[currentIdx + 1].value);
 	}
 
 	$: displayed = (() => {
-		const cutoff = Date.now() - $historyWindowHours * 60 * 60 * 1000;
+		const cutoff = Date.now() - $windowStore * 60 * 60 * 1000;
 		return history.filter((c) => toUtcDate(c.checked_at).getTime() >= cutoff);
 	})();
 
@@ -66,7 +69,7 @@
 				aria-label="Réduire la fenêtre d'historique">−</button
 			>
 			<select
-				bind:value={$historyWindowHours}
+				bind:value={$windowStore}
 				on:click|stopPropagation
 				on:mousedown|stopPropagation
 				aria-label="Fenêtre d'historique"

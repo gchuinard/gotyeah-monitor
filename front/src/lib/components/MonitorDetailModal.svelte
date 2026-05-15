@@ -346,7 +346,7 @@
 
 			<!-- Status bar -->
 			<div class="px-6">
-				<StatusBar history={monitor.history} />
+				<StatusBar history={monitor.history} monitorId={monitor.id} />
 			</div>
 
 			<!-- Graphiques -->

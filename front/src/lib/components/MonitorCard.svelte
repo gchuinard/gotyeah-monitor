@@ -142,5 +142,5 @@
 		</div>
 	{/if}
 
-	<StatusBar {history} />
+	<StatusBar {history} monitorId={id} />
 </div>
