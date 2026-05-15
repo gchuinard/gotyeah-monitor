@@ -1,17 +1,17 @@
 import { writable, type Writable } from 'svelte/store';
 
-export type HistoryWindowPreset = { value: number; label: string };
+export type HistoryWindowPreset = { value: number; label: string; bucketMinutes: number };
 
 export const HISTORY_WINDOW_PRESETS: HistoryWindowPreset[] = [
-	{ value: 1, label: '1h' },
-	{ value: 2, label: '2h' },
-	{ value: 3, label: '3h' },
-	{ value: 6, label: '6h' },
-	{ value: 12, label: '12h' },
-	{ value: 24, label: '1j' },
-	{ value: 48, label: '2j' },
-	{ value: 72, label: '3j' },
-	{ value: 168, label: '7j' }
+	{ value: 1, label: '1h', bucketMinutes: 10 },
+	{ value: 2, label: '2h', bucketMinutes: 10 },
+	{ value: 3, label: '3h', bucketMinutes: 10 },
+	{ value: 6, label: '6h', bucketMinutes: 10 },
+	{ value: 12, label: '12h', bucketMinutes: 10 },
+	{ value: 24, label: '1j', bucketMinutes: 60 },
+	{ value: 48, label: '2j', bucketMinutes: 120 },
+	{ value: 72, label: '3j', bucketMinutes: 180 },
+	{ value: 168, label: '7j', bucketMinutes: 1440 }
 ];
 
 const STORAGE_KEY = 'historyWindowHours';
