@@ -17,6 +17,7 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URL
 - Ajout de monitors HTTP avec code de statut attendu configurable
 - Vérification automatique toutes les **10 minutes**
 - Suivi de la latence et de l'historique des checks (rétention **7 jours**)
+- Visualisation de l'historique avec **fenêtre temporelle configurable par monitor** (1h → 7j), persistée localement ; bucketing adaptatif des barres de statut (10 min sur les vues courtes, jusqu'à 1 jour sur 7j) avec couleur intermédiaire pour les périodes mixtes
 - Détection et affichage de l'**expiration SSL**
 - Authentification complète : inscription, vérification email, connexion JWT
 - Réinitialisation de mot de passe et changement d'email par token
