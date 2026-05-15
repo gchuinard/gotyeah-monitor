@@ -63,8 +63,7 @@
 				on:click|stopPropagation={stepDown}
 				disabled={atMin}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
-				aria-label="Réduire la fenêtre d'historique"
-				>−</button
+				aria-label="Réduire la fenêtre d'historique">−</button
 			>
 			<select
 				bind:value={$historyWindowHours}
@@ -81,8 +80,7 @@
 				on:click|stopPropagation={stepUp}
 				disabled={atMax}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
-				aria-label="Agrandir la fenêtre d'historique"
-				>+</button
+				aria-label="Agrandir la fenêtre d'historique">+</button
 			>
 		</div>
 		{#if uptimePct !== null}
