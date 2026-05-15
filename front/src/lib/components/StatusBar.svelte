@@ -1,18 +1,27 @@
 <script lang="ts">
 	import type { CheckEntry } from '$lib/stores/monitors';
+	import { HISTORY_WINDOW_PRESETS, historyWindowHours } from '$lib/stores/historyWindow';
 
 	export let history: CheckEntry[] = [];
-
-	let windowHours = 2;
-	const MIN_HOURS = 1;
-	const MAX_HOURS = 12;
 
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
+	$: currentIdx = HISTORY_WINDOW_PRESETS.findIndex((p) => p.value === $historyWindowHours);
+	$: atMin = currentIdx <= 0;
+	$: atMax = currentIdx >= HISTORY_WINDOW_PRESETS.length - 1;
+
+	function stepDown() {
+		if (currentIdx > 0) historyWindowHours.set(HISTORY_WINDOW_PRESETS[currentIdx - 1].value);
+	}
+	function stepUp() {
+		if (currentIdx >= 0 && currentIdx < HISTORY_WINDOW_PRESETS.length - 1)
+			historyWindowHours.set(HISTORY_WINDOW_PRESETS[currentIdx + 1].value);
+	}
+
 	$: displayed = (() => {
-		const cutoff = Date.now() - windowHours * 60 * 60 * 1000;
+		const cutoff = Date.now() - $historyWindowHours * 60 * 60 * 1000;
 		return history.filter((c) => toUtcDate(c.checked_at).getTime() >= cutoff);
 	})();
 
@@ -51,16 +60,28 @@
 	<div class="flex items-center justify-between text-[11px] text-slate-400">
 		<div class="flex items-center gap-1.5">
 			<button
-				on:click|stopPropagation={() => (windowHours = Math.max(MIN_HOURS, windowHours - 1))}
-				disabled={windowHours <= MIN_HOURS}
+				on:click|stopPropagation={stepDown}
+				disabled={atMin}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
+				aria-label="Réduire la fenêtre d'historique"
 				>−</button
 			>
-			<span class="tabular-nums">{windowHours}h</span>
+			<select
+				bind:value={$historyWindowHours}
+				on:click|stopPropagation
+				on:mousedown|stopPropagation
+				aria-label="Fenêtre d'historique"
+				class="tabular-nums text-[11px] text-slate-300 bg-slate-700/60 hover:bg-slate-600/80 rounded px-1 h-4 leading-none border-0 focus:outline-none focus:ring-1 focus:ring-cyan-400/60 cursor-pointer appearance-none text-center"
+			>
+				{#each HISTORY_WINDOW_PRESETS as p (p.value)}
+					<option value={p.value} class="bg-slate-800 text-slate-200">{p.label}</option>
+				{/each}
+			</select>
 			<button
-				on:click|stopPropagation={() => (windowHours = Math.min(MAX_HOURS, windowHours + 1))}
-				disabled={windowHours >= MAX_HOURS}
+				on:click|stopPropagation={stepUp}
+				disabled={atMax}
 				class="w-4 h-4 rounded flex items-center justify-center bg-slate-700/60 hover:bg-slate-600/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none"
+				aria-label="Agrandir la fenêtre d'historique"
 				>+</button
 			>
 		</div>
