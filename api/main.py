@@ -54,6 +54,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 CHECK_INTERVAL_SECONDS = 600
 HISTORY_RETENTION_DAYS = 7
+# Les incidents (clos) sont conservés bien plus longtemps que les checks (historique
+# long terme), mais bornés pour éviter une croissance illimitée de la table.
+INCIDENT_RETENTION_DAYS = 90
 MAX_CONCURRENT_CHECKS = 10
 
 logger = logging.getLogger("monitor")
@@ -176,6 +179,15 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             cutoff = datetime.now(timezone.utc) - timedelta(days=HISTORY_RETENTION_DAYS)
             await session.execute(
                 delete(models.MonitorCheck).where(models.MonitorCheck.checked_at < cutoff)
+            )
+            # Purge des incidents CLOS trop anciens (les incidents en cours, ended_at IS
+            # NULL, ne sont jamais supprimés).
+            inc_cutoff = datetime.now(timezone.utc) - timedelta(days=INCIDENT_RETENTION_DAYS)
+            await session.execute(
+                delete(models.Incident).where(
+                    models.Incident.ended_at.is_not(None),
+                    models.Incident.ended_at < inc_cutoff,
+                )
             )
             await session.commit()
     except Exception:
