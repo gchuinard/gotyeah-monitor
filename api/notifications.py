@@ -13,6 +13,7 @@ from typing import List, Optional
 import httpx
 
 import models
+from ssrf_guard import url_is_safe
 from mail_service import (
     send_monitor_down_email,
     send_monitor_up_email,
@@ -28,7 +29,10 @@ SSL_ALERT_THRESHOLDS = (1, 7, 14, 30)
 
 
 def _ssl_level(days_left: int) -> Optional[int]:
-    """Plus petit palier T tel que days_left <= T (None si rien à alerter)."""
+    """Palier d'alerte courant (None si rien à alerter). Niveau 0 = certificat expiré,
+    pour qu'une alerte distincte parte aussi au moment réel de l'expiration."""
+    if days_left < 0:
+        return 0
     for t in sorted(SSL_ALERT_THRESHOLDS):
         if days_left <= t:
             return t
@@ -141,7 +145,11 @@ async def _send_one(client: httpx.AsyncClient, a: _Alert) -> None:
     # Webhook best-effort (n'influence pas le drapeau "déjà notifié")
     if user.alert_webhook_url:
         try:
-            await _send_webhook(client, user.alert_webhook_url, user.alert_webhook_kind, _alert_text(a))
+            # Anti-SSRF : ne jamais POSTer vers une cible interne (même garde que les checks).
+            if await url_is_safe(user.alert_webhook_url):
+                await _send_webhook(client, user.alert_webhook_url, user.alert_webhook_kind, _alert_text(a))
+            else:
+                logger.warning("Webhook ignoré : URL vers une cible interne/non autorisée")
         except Exception:
             logger.exception("Échec envoi webhook d'alerte (%s / %s)", a.kind, a.monitor_name)
 

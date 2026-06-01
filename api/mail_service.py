@@ -362,7 +362,12 @@ async def send_monitor_up_email(
 
 
 async def send_ssl_expiry_email(to: str, name: str, days_left: int) -> None:
-    urgency = "expiré" if days_left < 0 else f"expire dans {days_left} jour(s)"
+    if days_left < 0:
+        urgency = "est expiré"
+    elif days_left == 0:
+        urgency = "expire aujourd'hui"
+    else:
+        urgency = f"expire dans {days_left} jour(s)"
     content = f"""
       <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
         Le certificat SSL de <strong style="color:#0f172a;">{name}</strong> {urgency}.

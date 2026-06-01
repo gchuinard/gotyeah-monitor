@@ -17,6 +17,7 @@ from database import get_db
 import models
 import schemas
 from rate_limit import limiter
+from ssrf_guard import url_is_safe
 from mail_service import (
     send_verification_email,
     send_password_reset_email,
@@ -346,6 +347,11 @@ async def update_me(
     # Config webhook d'alerte : "" => effacer, valeur => définir, None => ne pas toucher.
     if payload.alert_webhook_url is not None:
         url = payload.alert_webhook_url.strip()
+        if url and not await url_is_safe(url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="URL de webhook invalide ou pointant vers une cible interne.",
+            )
         current_user.alert_webhook_url = url or None
         current_user.alert_webhook_kind = (payload.alert_webhook_kind or None) if url else None
 

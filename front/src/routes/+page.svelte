@@ -122,6 +122,8 @@
 		profileConfirmPassword = '';
 		profilePasswordError = null;
 		profilePasswordSuccess = null;
+		profileWebhookUrl = '';
+		profileWebhookKind = 'discord';
 		profileWebhookError = null;
 		profileWebhookSuccess = null;
 		profileConfirmDelete = false;
