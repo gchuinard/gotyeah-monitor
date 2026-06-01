@@ -88,6 +88,16 @@ class MonitorCheckRead(BaseModel):
         from_attributes = True
 
 
+class IncidentRead(BaseModel):
+    id: int
+    started_at: datetime
+    ended_at: Optional[datetime] = None  # None = incident en cours
+    last_status_code: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
 class MessageResponse(BaseModel):
     message: str
 

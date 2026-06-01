@@ -2,6 +2,7 @@
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { apiFetch } from '$lib/utils/api';
+	import { onMount } from 'svelte';
 	import type { MonitorCardData } from '$lib/stores/monitors';
 
 	export let monitor: MonitorCardData;
@@ -12,6 +13,40 @@
 	let deleting = false;
 	let showConfirmDelete = false;
 	let deleteConfirmText = '';
+
+	// ── Journal d'incidents ─────────────────────────────────────────────────
+	type IncidentEntry = {
+		id: number;
+		started_at: string;
+		ended_at: string | null;
+		last_status_code: number | null;
+	};
+	let incidents: IncidentEntry[] = [];
+	let incidentsLoaded = false;
+
+	async function loadIncidents() {
+		try {
+			const res = await apiFetch(`/monitors/${monitor.id}/incidents`);
+			if (res.ok) incidents = (await res.json()) as IncidentEntry[];
+		} catch {
+			/* best-effort */
+		} finally {
+			incidentsLoaded = true;
+		}
+	}
+
+	onMount(loadIncidents);
+
+	function incidentDuration(inc: IncidentEntry): string {
+		const start = toUtcDate(inc.started_at).getTime();
+		const end = inc.ended_at ? toUtcDate(inc.ended_at).getTime() : Date.now();
+		const mins = Math.max(0, Math.round((end - start) / 60000));
+		if (mins < 60) return `${mins} min`;
+		const h = Math.floor(mins / 60);
+		const m = mins % 60;
+		if (h < 24) return `${h}h${String(m).padStart(2, '0')}`;
+		return `${Math.floor(h / 24)}j ${h % 24}h`;
+	}
 
 	// ── Mode édition ───────────────────────────────────────────────────────
 	let editing = false;
@@ -455,6 +490,51 @@
 								</span>
 								<span class="ml-auto text-slate-500 font-mono text-[11px]">
 									{toUtcDate(c.checked_at).toLocaleString('fr-FR', {
+										day: '2-digit',
+										month: '2-digit',
+										hour: '2-digit',
+										minute: '2-digit'
+									})}
+								</span>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Journal d'incidents -->
+			<div class="px-6 flex flex-col gap-2">
+				<div class="flex items-center justify-between">
+					<span class="text-[10px] text-slate-500 uppercase tracking-wide">Journal d'incidents</span
+					>
+					{#if incidentsLoaded && incidents.length > 0}
+						<span class="text-[10px] text-slate-500">{incidents.length} sur 50 max</span>
+					{/if}
+				</div>
+				{#if !incidentsLoaded}
+					<p class="text-xs text-slate-500">Chargement...</p>
+				{:else if incidents.length === 0}
+					<p class="text-xs text-slate-500">Aucun incident enregistré. 🎉</p>
+				{:else}
+					<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
+						{#each incidents as inc (inc.id)}
+							<div
+								class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+							>
+								<span
+									class={`w-1.5 h-1.5 rounded-full shrink-0 ${inc.ended_at ? 'bg-slate-500' : 'bg-red-400 animate-pulse'}`}
+								></span>
+								<span class={`font-medium ${inc.ended_at ? 'text-slate-400' : 'text-rose-300'}`}>
+									{inc.ended_at ? 'Résolu' : 'En cours'}
+								</span>
+								{#if inc.last_status_code}
+									<span class="text-slate-500 font-mono text-[11px]"
+										>code {inc.last_status_code}</span
+									>
+								{/if}
+								<span class="text-rose-300 font-mono text-[11px]">{incidentDuration(inc)}</span>
+								<span class="ml-auto text-slate-500 font-mono text-[11px]">
+									{toUtcDate(inc.started_at).toLocaleString('fr-FR', {
 										day: '2-digit',
 										month: '2-digit',
 										hour: '2-digit',
