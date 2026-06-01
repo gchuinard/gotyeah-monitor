@@ -7,6 +7,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # La DB est joignable via le nom de service sur monitor_net, pas via localhost.
+      DB_HOST: db
     depends_on:
       db:
         condition: service_healthy
@@ -34,6 +37,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # L'image mysql ne crée la base/l'utilisateur que via les variables MYSQL_*.
+      # On les dérive des DB_* déjà présentes dans .env (MYSQL_ROOT_PASSWORD à ajouter).
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
     networks:
@@ -41,7 +51,7 @@ services:
     expose:
       - "3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "monitor", "-pmonitor"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10

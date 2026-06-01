@@ -22,9 +22,22 @@ from mail_service import (
 )
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+
+# Sécurité : pas de clé en dur. En prod (DEBUG désactivé) on refuse de démarrer
+# si SECRET_KEY est absent ou trop faible — sinon tous les JWT seraient signés
+# avec une clé devinable, permettant de forger un token pour n'importe quel compte.
+_DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+    if _DEBUG:
+        SECRET_KEY = SECRET_KEY or "dev-only-insecure-key-not-for-production-use-0123456789"
+    else:
+        raise RuntimeError(
+            "SECRET_KEY manquant ou trop court (minimum 32 caractères). "
+            "Générez-en un avec : python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+        )
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
