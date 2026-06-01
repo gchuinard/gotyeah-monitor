@@ -58,6 +58,11 @@ HISTORY_RETENTION_DAYS = 7
 # long terme), mais bornés pour éviter une croissance illimitée de la table.
 INCIDENT_RETENTION_DAYS = 90
 MAX_CONCURRENT_CHECKS = 10
+# La boucle est considérée "bloquée" si aucun cycle n'a abouti depuis 3 intervalles.
+LOOP_STALE_AFTER_SECONDS = CHECK_INTERVAL_SECONDS * 3
+# Dead-man switch : ping sortant à chaque cycle vers un service tiers (ex. healthchecks.io).
+# C'est un réglage opérateur (variable d'env), pas une URL utilisateur -> pas de garde SSRF.
+HEARTBEAT_URL = os.getenv("HEARTBEAT_URL", "").strip()
 
 logger = logging.getLogger("monitor")
 
@@ -227,33 +232,68 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             logger.exception("Échec de l'itération de monitoring (rollback)")
 
 
+async def _heartbeat(client: httpx.AsyncClient) -> None:
+    """Dead-man switch : signale à un service tiers que la boucle tourne (best-effort)."""
+    if not HEARTBEAT_URL:
+        return
+    try:
+        await client.get(HEARTBEAT_URL, timeout=10.0)
+    except Exception:
+        logger.warning("Échec du ping heartbeat (dead-man switch)")
+
+
 async def monitor_loop() -> None:
     # follow_redirects=False : une redirection vers une cible interne contournerait
     # le contrôle anti-SSRF fait sur l'URL d'origine.
+    # NB : last_cycle_at n'est PAS posé ici (au démarrage) — sinon un crash-loop qui
+    # relance la boucle sans jamais finir un cycle garderait /health vert à tort.
     async with httpx.AsyncClient(follow_redirects=False) as client:
         while True:
             try:
                 await _run_one_cycle(client)
+                # Liveness : un cycle a ABOUTI. On réarme aussi le backoff de redémarrage.
+                app.state.last_cycle_at = datetime.now(timezone.utc)
+                app.state.restart_count = 0
             except Exception:
                 logger.exception("Erreur inattendue dans la boucle de monitoring")
+            await _heartbeat(client)
             await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 
+def _spawn_monitor_loop() -> None:
+    if getattr(app.state, "shutting_down", False):
+        return
+    task = asyncio.create_task(monitor_loop())
+    task.add_done_callback(_on_monitor_task_done)
+    app.state.monitor_task = task
+
+
 def _on_monitor_task_done(task: "asyncio.Task[None]") -> None:
-    # Filet de sécurité : si la boucle meurt malgré tout, on le journalise
-    # au lieu de laisser l'exception disparaître silencieusement au GC.
-    if task.cancelled():
+    # Watchdog : relance la boucle si elle meurt (hors arrêt de l'app), AVEC un backoff
+    # exponentiel borné — sinon un échec persistant avant la boucle (ex. épuisement de
+    # ressources sur le Pi) provoquerait une boucle de redémarrage serrée. Le compteur
+    # est remis à 0 dès qu'un cycle aboutit (monitor_loop).
+    if getattr(app.state, "shutting_down", False) or task.cancelled():
         return
     exc = task.exception()
-    if exc is not None:
-        logger.error(
-            "La boucle de monitoring s'est arrêtée sur une exception", exc_info=exc
-        )
+    if exc is None:
+        return
+    n = getattr(app.state, "restart_count", 0)
+    app.state.restart_count = n + 1
+    delay = min(60, 2 ** min(n, 6))  # 1, 2, 4, … plafonné à 60 s
+    logger.error(
+        "Boucle de monitoring arrêtée — redémarrage dans %ss", delay, exc_info=exc
+    )
+    asyncio.get_running_loop().call_later(delay, _spawn_monitor_loop)
 
 
 @app.on_event("startup")
 async def on_startup() -> None:
     await init_db()
+    app.state.shutting_down = False
+    app.state.last_cycle_at = None
+    app.state.loop_started_at = datetime.now(timezone.utc)
+    app.state.restart_count = 0
     task = asyncio.create_task(monitor_loop())
     task.add_done_callback(_on_monitor_task_done)
     app.state.monitor_task = task
@@ -261,6 +301,7 @@ async def on_startup() -> None:
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    app.state.shutting_down = True
     task = getattr(app.state, "monitor_task", None)
     if task:
         task.cancel()
@@ -279,14 +320,41 @@ app.add_middleware(
 )
 
 
+def _loop_health() -> tuple[bool, dict]:
+    """Liveness réelle de la boucle de monitoring (et pas un simple 'ok' statique)."""
+    now = datetime.now(timezone.utc)
+    last = getattr(app.state, "last_cycle_at", None)
+    if last is not None:
+        age = (now - last).total_seconds()
+        ok = age < LOOP_STALE_AFTER_SECONDS
+        return ok, {
+            "status": "ok" if ok else "degraded",
+            "monitor_loop": "alive" if ok else "stale",
+            "last_cycle_at": last.isoformat(),
+            "seconds_since_last_cycle": round(age),
+        }
+    # Aucun cycle abouti : grâce au démarrage, MAIS devient stale si ça dure trop
+    # (ex. crash-loop avant le 1er cycle) — loop_started_at n'est PAS réinitialisé aux relances.
+    started = getattr(app.state, "loop_started_at", None)
+    grace = started is None or (now - started).total_seconds() < LOOP_STALE_AFTER_SECONDS
+    return grace, {
+        "status": "starting" if grace else "degraded",
+        "monitor_loop": "starting" if grace else "stale",
+        "last_cycle_at": None,
+        "seconds_since_last_cycle": None,
+    }
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    ok, body = _loop_health()
+    return JSONResponse(status_code=200 if ok else 503, content=body)
 
 
 @app.head("/health")
 async def health_head():
-    return
+    ok, _ = _loop_health()
+    return JSONResponse(status_code=200 if ok else 503, content=None)
 
 
 app.include_router(auth_router)

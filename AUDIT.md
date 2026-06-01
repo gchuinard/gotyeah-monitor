@@ -1,5 +1,7 @@
 # Audit — gotyeah-monitor
 
+> ✅ **Statut de remédiation (mise à jour 2026-06-01)** : la quasi-totalité des findings 🔴 critique → 🔵 faible ont été corrigés dans les PR #1 (critiques/élevés/moyens + lot de faibles) à #4, puis de nouvelles fonctionnalités ont été ajoutées (alerting, % uptime, journal d'incidents, auto-surveillance). Voir l'historique git. Ce rapport reste le **document d'audit initial** (point de départ) ; certains points ⚪ info/faibles ont été volontairement laissés (documentés en fin de fichier).
+
 > Audit réalisé le **2026-06-01**.
 > **Méthode** : 9 dimensions parcourues en parallèle (auth, SSRF/validation, backend async, frontend cœur, composants frontend, données/migrations, infra/CI, dépendances, cohérence docs) par des sous-agents, **chaque finding vérifié de façon adversariale** (re-lecture du code cité pour le confirmer ou le réfuter), puis recoupé manuellement avec la config réelle (`.env`, `requirements.txt`, `docker-compose`).
 > **Résultat** : 64 findings confirmés, 1 écarté.

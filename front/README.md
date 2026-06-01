@@ -18,7 +18,8 @@ npm run build    # build de production
 
 ## Repères
 
-- `src/routes/` — pages (dashboard, login, register, profil, admin…).
-- `src/lib/components/` — `MonitorCard`, `MonitorDetailModal`, `StatusBar`, `Sparkline`, `PasswordStrength`.
+- `src/routes/` — pages (dashboard, login, register, profil, admin…). Le profil contient la config **webhook d'alerte** (Notifications).
+- `src/lib/components/` — `MonitorCard` (badge **% uptime**), `MonitorDetailModal` (**journal d'incidents**), `StatusBar`, `Sparkline`, `PasswordStrength`.
 - `src/lib/stores/` — `auth`, `monitors`, `theme`, `historyWindow` (persistés en localStorage).
-- `src/lib/utils/api.ts` — `apiFetch()` : appels authentifiés (JWT) + déconnexion auto sur 401.
+- `src/lib/utils/api.ts` — `apiFetch()` : appels authentifiés (JWT) + déconnexion auto sur 401 (SSR-safe).
+- `src/lib/utils/errors.ts` — normalisation des erreurs API (gère le `detail` tableau des 422 FastAPI).

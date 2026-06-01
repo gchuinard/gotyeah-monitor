@@ -1,6 +1,6 @@
 # GotYeah Monitor
 
-Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URLs HTTP, vérifie les codes de statut, mesure la latence et suit l'expiration des certificats SSL.
+Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URLs HTTP, vérifie les codes de statut, mesure la latence, suit l'expiration des certificats SSL, **alerte par email et webhook quand un service tombe**, calcule le **% d'uptime** et tient un **journal d'incidents**.
 
 ## Stack technique
 
@@ -15,11 +15,15 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URL
 ## Fonctionnalités
 
 - Ajout de monitors HTTP avec code de statut attendu configurable
-- Vérification automatique toutes les **10 minutes**
+- Vérification automatique toutes les **10 minutes** (checks réseau concurrents, bornés)
 - Suivi de la latence et de l'historique des checks (rétention **7 jours**)
 - Visualisation de l'historique avec **fenêtre temporelle configurable par monitor** (1h → 7j), persistée localement ; bucketing adaptatif des barres de statut (10 min sur les vues courtes, jusqu'à 1 jour sur 7j) avec couleur intermédiaire pour les périodes mixtes
+- **% d'uptime (24h / 7j)** affiché sur chaque carte
+- **Alerting** : email + webhook (Discord / Slack / ntfy) sur **panne** (après 2 échecs consécutifs — anti-flapping), **rétablissement**, et **expiration SSL** (J-30 / J-14 / J-7 / J-1 / expiré)
+- **Journal d'incidents** persisté (ouverture/fermeture automatiques, conservé bien au-delà des checks)
+- **Auto-surveillance** : endpoint `/health` reflétant la liveness réelle de la boucle, watchdog (relance la boucle si elle meurt) et dead-man switch sortant optionnel (`HEARTBEAT_URL`)
 - Détection et affichage de l'**expiration SSL**
-- Authentification complète : inscription, vérification email, connexion JWT
+- Authentification complète : inscription, vérification email, connexion JWT (rate-limitée, tokens hachés au repos)
 - Réinitialisation de mot de passe et changement d'email par token
 - Interface d'administration
 
@@ -29,14 +33,17 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URL
 gotyeah-monitor/
 ├── api/                  # FastAPI — logique métier, checks, auth
 │   ├── routers/
-│   │   ├── monitors.py   # CRUD monitors + historique
+│   │   ├── monitors.py   # CRUD monitors + historique + % uptime + incidents
 │   │   └── admin.py      # Routes admin
-│   ├── auth.py           # JWT, inscription, vérification email
+│   ├── auth.py           # JWT (PyJWT), inscription, vérification email, rate-limit
 │   ├── models.py         # Modèles SQLAlchemy
 │   ├── schemas.py        # Schémas Pydantic
 │   ├── database.py       # Session async MySQL
-│   ├── mail_service.py   # Envoi d'emails (SMTP)
-│   ├── main.py           # App FastAPI + boucle de monitoring
+│   ├── mail_service.py   # Envoi d'emails (SMTP) : auth + alertes
+│   ├── notifications.py  # Moteur d'alerting (transitions, SSL) + webhooks
+│   ├── ssrf_guard.py     # Garde anti-SSRF partagée (checks + webhooks)
+│   ├── rate_limit.py     # Limiteur de débit (slowapi)
+│   ├── main.py           # App FastAPI + boucle de monitoring + /health + watchdog
 │   └── alembic/          # Migrations DB
 ├── front/                # SvelteKit — interface utilisateur
 │   └── src/
@@ -96,7 +103,12 @@ SMTP_FROM=noreply@gotyeah.local
 
 FRONTEND_URL=http://localhost:5173 # base des liens dans les emails
 VITE_API_URL=http://localhost:8000
+
+# Optionnel — dead-man switch : pingé à chaque cycle (ex. healthchecks.io)
+# HEARTBEAT_URL=
 ```
+
+> Le **webhook d'alerte** (Discord / Slack / ntfy) n'est pas une variable d'env : il se configure **par utilisateur** dans Profil → Notifications.
 
 ## Déploiement en production
 
@@ -127,6 +139,7 @@ VITE_API_URL=https://api.votre-domaine.com
 ADMIN_EMAILS=...
 FRONTEND_URL=https://votre-domaine.com
 # + variables SMTP réelles (SMTP_HOST/PORT/USER/PASSWORD/SMTP_FROM)
+# HEARTBEAT_URL=...                  # optionnel : dead-man switch (ex. healthchecks.io)
 ```
 
 > Un reverse proxy (Nginx, Caddy…) doit exposer les conteneurs `monitor_api_prod` (port 8000) et `monitor_front_prod` (port 80) vers l'extérieur.
@@ -159,7 +172,12 @@ alembic revision --autogenerate -m "description"   # créer une migration
 
 ## Endpoint de santé
 
+`/health` reflète la **liveness réelle de la boucle de monitoring** (et pas un simple `ok` statique) : il renvoie **503** si aucun cycle n'a abouti depuis 3 intervalles (~30 min), ce qui permet à un healthcheck/observateur externe de détecter une boucle bloquée.
+
 ```
-GET /health   →  { "status": "ok" }
-HEAD /health
+GET  /health  → 200 { "status": "ok",       "monitor_loop": "alive", "last_cycle_at": "…", "seconds_since_last_cycle": 42 }
+              → 503 { "status": "degraded",  "monitor_loop": "stale", … }   # boucle bloquée
+HEAD /health  → 200 / 503
 ```
+
+En complément, un **watchdog** relance automatiquement la boucle si la tâche meurt, et un **dead-man switch** (`HEARTBEAT_URL`) pingue un service tiers à chaque cycle.
