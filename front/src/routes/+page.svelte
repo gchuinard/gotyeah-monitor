@@ -107,7 +107,14 @@
 		profilePasswordValid &&
 		profilePassword === profileConfirmPassword;
 
-	function openProfile() {
+	// Webhook d'alerte (Notifications)
+	let profileWebhookUrl = '';
+	let profileWebhookKind = 'discord';
+	let profileWebhookSubmitting = false;
+	let profileWebhookError: string | null = null;
+	let profileWebhookSuccess: string | null = null;
+
+	async function openProfile() {
 		profileNewEmail = '';
 		profileEmailError = null;
 		profileEmailSuccess = null;
@@ -115,9 +122,52 @@
 		profileConfirmPassword = '';
 		profilePasswordError = null;
 		profilePasswordSuccess = null;
+		profileWebhookUrl = '';
+		profileWebhookKind = 'discord';
+		profileWebhookError = null;
+		profileWebhookSuccess = null;
 		profileConfirmDelete = false;
 		profileDeleteConfirmText = '';
 		showProfile = true;
+
+		// Pré-remplit la config webhook actuelle (best-effort).
+		try {
+			const res = await apiFetch('/auth/me');
+			if (res.ok) {
+				const me = await res.json();
+				profileWebhookUrl = me.alert_webhook_url ?? '';
+				profileWebhookKind = me.alert_webhook_kind ?? 'discord';
+			}
+		} catch {
+			/* best-effort */
+		}
+	}
+
+	async function saveWebhook() {
+		profileWebhookSubmitting = true;
+		profileWebhookError = null;
+		profileWebhookSuccess = null;
+		try {
+			const res = await apiFetch('/auth/me', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					alert_webhook_url: profileWebhookUrl,
+					alert_webhook_kind: profileWebhookKind
+				})
+			});
+			if (!res.ok) {
+				profileWebhookError = await parseApiError(res, 'webhook');
+			} else {
+				profileWebhookSuccess = profileWebhookUrl.trim()
+					? 'Webhook enregistré.'
+					: 'Webhook désactivé.';
+			}
+		} catch (e) {
+			profileWebhookError = parseNetworkError(e, 'webhook');
+		} finally {
+			profileWebhookSubmitting = false;
+		}
 	}
 
 	async function submitEmailChange() {
@@ -771,6 +821,72 @@
 							disabled={profileEmailSubmitting || !profileNewEmail}
 						>
 							{profileEmailSubmitting ? 'Envoi...' : 'Envoyer le lien de confirmation'}
+						</button>
+					</div>
+				</form>
+
+				<!-- Notifications (webhook) -->
+				<form
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+					on:submit|preventDefault={saveWebhook}
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+					>
+						Notifications
+					</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+						Les alertes (panne, rétablissement, expiration SSL) sont envoyées par email. Tu peux
+						aussi recevoir un webhook.
+					</p>
+
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Type</span>
+						<select
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileWebhookKind}
+						>
+							<option value="discord">Discord</option>
+							<option value="slack">Slack</option>
+							<option value="ntfy">ntfy</option>
+							<option value="generic">Webhook générique (JSON)</option>
+						</select>
+					</label>
+
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400"
+							>URL du webhook (vide = désactivé)</span
+						>
+						<input
+							type="url"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileWebhookUrl}
+							placeholder="https://discord.com/api/webhooks/..."
+						/>
+					</label>
+
+					{#if profileWebhookError}
+						<div
+							class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
+						>
+							{profileWebhookError}
+						</div>
+					{/if}
+					{#if profileWebhookSuccess}
+						<div
+							class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
+						>
+							{profileWebhookSuccess}
+						</div>
+					{/if}
+
+					<div class="flex justify-end pt-1">
+						<button
+							type="submit"
+							class="btn btn-sm btn-primary disabled:opacity-50"
+							disabled={profileWebhookSubmitting}
+						>
+							{profileWebhookSubmitting ? 'Enregistrement...' : 'Enregistrer'}
 						</button>
 					</div>
 				</form>

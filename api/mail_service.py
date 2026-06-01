@@ -1,6 +1,8 @@
 import os
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 import aiosmtplib
 
@@ -285,3 +287,98 @@ async def send_account_exists_notice(to: str) -> None:
         content=content,
     )
     await _send(to, "Tentative de création de compte – GotYeah Monitor", html)
+
+
+def _fmt_dt(dt: Optional[datetime]) -> str:
+    if dt is None:
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.strftime("%d/%m/%Y à %H:%M UTC")
+
+
+def _fmt_duration(start: Optional[datetime], end: datetime) -> str:
+    if start is None:
+        return "—"
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    secs = max(0, int((end - start).total_seconds()))
+    if secs < 60:
+        return f"{secs}s"
+    mins = secs // 60
+    if mins < 60:
+        return f"{mins} min"
+    hours = mins // 60
+    rem = mins % 60
+    if hours < 24:
+        return f"{hours}h{rem:02d}"
+    days = hours // 24
+    return f"{days}j {hours % 24}h"
+
+
+async def send_monitor_down_email(
+    to: str, name: str, status_code: Optional[int], since: Optional[datetime]
+) -> None:
+    reason = f"code HTTP {status_code}" if status_code is not None else "aucune réponse (timeout / erreur de connexion)"
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Le monitor <strong style="color:#0f172a;">{name}</strong> est passé
+        <strong style="color:#e11d48;">DOWN</strong>.
+      </p>
+      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;padding:16px 20px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#9f1239;">Détail : {reason}</p>
+        <p style="margin:0;font-size:13px;color:#9f1239;">Indisponible depuis : {_fmt_dt(since)}</p>
+      </div>
+      <p style="margin:20px 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+        Tu recevras un email dès que le service sera de nouveau disponible.
+      </p>
+    """
+    html = _base_template(
+        title="🔴 Service indisponible",
+        preview=f"{name} est DOWN.",
+        content=content,
+    )
+    await _send(to, f"🔴 {name} est DOWN – GotYeah Monitor", html)
+
+
+async def send_monitor_up_email(
+    to: str, name: str, down_since: Optional[datetime], now: datetime
+) -> None:
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Le monitor <strong style="color:#0f172a;">{name}</strong> est de nouveau
+        <strong style="color:#059669;">UP</strong>. ✅
+      </p>
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:16px 20px;">
+        <p style="margin:0;font-size:13px;color:#065f46;">Durée de l'indisponibilité : {_fmt_duration(down_since, now)}</p>
+      </div>
+    """
+    html = _base_template(
+        title="🟢 Service rétabli",
+        preview=f"{name} est de nouveau UP.",
+        content=content,
+    )
+    await _send(to, f"🟢 {name} est rétabli – GotYeah Monitor", html)
+
+
+async def send_ssl_expiry_email(to: str, name: str, days_left: int) -> None:
+    if days_left < 0:
+        urgency = "est expiré"
+    elif days_left == 0:
+        urgency = "expire aujourd'hui"
+    else:
+        urgency = f"expire dans {days_left} jour(s)"
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Le certificat SSL de <strong style="color:#0f172a;">{name}</strong> {urgency}.
+      </p>
+      <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+        Pense à le renouveler pour éviter une interruption de service et des avertissements navigateur.
+      </p>
+    """
+    html = _base_template(
+        title="⏳ Certificat SSL bientôt expiré",
+        preview=f"Le certificat de {name} {urgency}.",
+        content=content,
+    )
+    await _send(to, f"⏳ Certificat SSL de {name} – GotYeah Monitor", html)

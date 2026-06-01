@@ -1,5 +1,4 @@
 import asyncio
-import ipaddress
 import logging
 import os
 import ssl
@@ -12,6 +11,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,6 +23,8 @@ from slowapi.errors import RateLimitExceeded
 from database import AsyncSessionLocal, init_db
 import models
 from rate_limit import limiter
+from ssrf_guard import url_is_safe
+from notifications import evaluate_alerts, dispatch_alerts
 from routers import monitors
 from routers import admin
 from auth import router as auth_router
@@ -55,46 +57,6 @@ HISTORY_RETENTION_DAYS = 7
 MAX_CONCURRENT_CHECKS = 10
 
 logger = logging.getLogger("monitor")
-
-
-def _ip_is_blocked(ip_str: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(ip_str)
-    except ValueError:
-        return True
-    return (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
-    )
-
-
-def _host_resolves_to_blocked_ip(hostname: str, port: int) -> bool:
-    """Anti-SSRF : True si l'hôte résout (même partiellement) vers une IP interne/privée."""
-    try:
-        infos = socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)
-    except Exception:
-        return True  # résolution impossible -> on bloque par précaution
-    return any(_ip_is_blocked(info[4][0]) for info in infos)
-
-
-async def url_is_safe(url: str) -> bool:
-    """Refuse une URL de monitor qui ciblerait le réseau interne (loopback, RFC1918,
-    link-local/métadonnées cloud, etc.). Résolution faite au moment du check."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return False
-    hostname = parsed.hostname
-    if not hostname:
-        return False
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    loop = asyncio.get_event_loop()
-    return not await loop.run_in_executor(
-        None, _host_resolves_to_blocked_ip, hostname, port
-    )
 
 
 def _fetch_ssl_expiry(hostname: str, port: int = 443) -> Optional[datetime]:
@@ -188,7 +150,10 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
 
     async with AsyncSessionLocal() as session:
         try:
-            result = await session.execute(select(models.Monitor))
+            # selectinload(user) : la boucle a besoin de l'email/webhook de l'owner pour alerter.
+            result = await session.execute(
+                select(models.Monitor).options(selectinload(models.Monitor.user))
+            )
             all_monitors = list(result.scalars().all())
 
             # Checks réseau en parallèle (bornés), puis application séquentielle en base
@@ -204,6 +169,11 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             now = datetime.now(timezone.utc)
             for monitor, res in zip(all_monitors, results):
                 apply_check_result(monitor, res, now, session)
+
+            # Alerting : détecte les transitions / SSL, envoie email+webhook, pose les
+            # drapeaux anti-répétition (persistés au commit ci-dessous).
+            alerts = evaluate_alerts(all_monitors, now)
+            await dispatch_alerts(client, alerts)
 
             await session.commit()
         except Exception:
