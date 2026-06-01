@@ -163,3 +163,24 @@ async def get_monitor_history(
         .order_by(models.MonitorCheck.checked_at.asc())
     )
     return list(result.scalars().all())
+
+
+@router.get("/{monitor_id}/incidents", response_model=List[schemas.IncidentRead])
+async def get_monitor_incidents(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> List[schemas.IncidentRead]:
+    monitor = await db.get(models.Monitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    result = await db.execute(
+        select(models.Incident)
+        .where(models.Incident.monitor_id == monitor_id)
+        .order_by(models.Incident.started_at.desc())
+        .limit(50)
+    )
+    return list(result.scalars().all())

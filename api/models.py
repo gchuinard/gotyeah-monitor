@@ -61,6 +61,7 @@ class Monitor(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     user = relationship("User", back_populates="monitors")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
+    incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
 
     # Non mappés (pas des colonnes) : remplis à la lecture par le routeur via une
     # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
@@ -86,6 +87,21 @@ class MonitorCheck(Base):
     checked_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
     monitor = relationship("Monitor", back_populates="checks")
+
+
+class Incident(Base):
+    __tablename__ = "incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    monitor_id = Column(
+        Integer, ForeignKey("monitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    ended_at = Column(DateTime(timezone=True), nullable=True)  # NULL = incident en cours
+    last_status_code = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    monitor = relationship("Monitor", back_populates="incidents")
 
 
 class EmailVerification(Base):

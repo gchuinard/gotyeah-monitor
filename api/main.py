@@ -24,7 +24,7 @@ from database import AsyncSessionLocal, init_db
 import models
 from rate_limit import limiter
 from ssrf_guard import url_is_safe
-from notifications import evaluate_alerts, dispatch_alerts
+from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD
 from routers import monitors
 from routers import admin
 from auth import router as auth_router
@@ -135,6 +135,39 @@ def apply_check_result(
     ))
 
 
+async def _sync_incidents(
+    session: AsyncSession, monitors: "list[models.Monitor]", now: datetime
+) -> None:
+    """Ouvre un incident quand un monitor est confirmé down (même seuil que l'alerte),
+    le ferme au rétablissement. Indépendant de l'envoi d'email, et non purgé par la
+    rétention (≠ monitor_checks) -> base de l'historique long terme."""
+    ids = [m.id for m in monitors]
+    if not ids:
+        return
+    res = await session.execute(
+        select(models.Incident).where(
+            models.Incident.monitor_id.in_(ids),
+            models.Incident.ended_at.is_(None),
+        )
+    )
+    open_by_monitor = {inc.monitor_id: inc for inc in res.scalars().all()}
+    for m in monitors:
+        confirmed_down = (
+            m.status == "down" and m.consecutive_failures >= ALERT_FAILURE_THRESHOLD
+        )
+        existing = open_by_monitor.get(m.id)
+        if confirmed_down and existing is None:
+            session.add(
+                models.Incident(
+                    monitor_id=m.id,
+                    started_at=m.down_since or now,
+                    last_status_code=m.last_status_code,
+                )
+            )
+        elif m.status == "up" and existing is not None:
+            existing.ended_at = now
+
+
 async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     # Nettoyage de rétention dans SA PROPRE transaction : un échec des checks ne
     # doit pas annuler le nettoyage, et inversement.
@@ -173,6 +206,7 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             # Alerting : détecte les transitions / SSL, envoie email+webhook, pose les
             # drapeaux anti-répétition (persistés au commit ci-dessous).
             alerts = evaluate_alerts(all_monitors, now)
+            await _sync_incidents(session, all_monitors, now)
             await dispatch_alerts(client, alerts)
 
             await session.commit()
