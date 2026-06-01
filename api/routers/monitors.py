@@ -32,7 +32,8 @@ async def _uptime_pct(
     )
     out: Dict[int, Optional[float]] = {}
     for mid, total, up in (await db.execute(stmt)).all():
-        out[mid] = round(100.0 * (up or 0) / total, 2) if total else None
+        # MySQL SUM() renvoie un Decimal -> float() avant le calcul (100.0 * Decimal lève TypeError).
+        out[mid] = round(100.0 * float(up or 0) / total, 2) if total else None
     return out
 
 
