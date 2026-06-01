@@ -239,3 +239,49 @@ async def send_password_reset_email(to: str, token: str) -> None:
         content=content,
     )
     await _send(to, "Réinitialisation de mot de passe – GotYeah Monitor", html)
+
+
+async def send_account_exists_notice(to: str) -> None:
+    """Mail envoyé quand quelqu'un tente de créer un compte avec une adresse déjà
+    utilisée et vérifiée (évite de révéler l'existence du compte au visiteur)."""
+    login_link = f"{FRONTEND_URL}/login"
+    forgot_link = f"{FRONTEND_URL}/forgot-password"
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Quelqu'un vient de tenter de créer un compte <strong style="color:#0f172a;">GotYeah Monitor</strong>
+        avec cette adresse email. Un compte existe déjà à votre nom.
+      </p>
+
+      <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+        Si c'était vous, connectez-vous simplement. Si vous avez oublié votre mot de passe,
+        vous pouvez le réinitialiser.
+      </p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+        <tr>
+          <td align="center">
+            <a href="{login_link}"
+               style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#0ea5e9,#6366f1);
+                      color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;
+                      border-radius:10px;letter-spacing:0.02em;">
+              Se connecter
+            </a>
+          </td>
+        </tr>
+      </table>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-top:8px;">
+        <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;">Mot de passe oublié ?</p>
+        <p style="margin:0;font-size:12px;color:#94a3b8;word-break:break-all;">{forgot_link}</p>
+      </div>
+
+      <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+        Si vous n'êtes pas à l'origine de cette tentative, vous pouvez ignorer cet email.
+      </p>
+    """
+    html = _base_template(
+        title="Un compte existe déjà",
+        preview="Une tentative de création de compte a été faite avec votre adresse.",
+        content=content,
+    )
+    await _send(to, "Tentative de création de compte – GotYeah Monitor", html)

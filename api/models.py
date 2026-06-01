@@ -12,6 +12,9 @@ class User(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
     is_verified = Column(Boolean, nullable=False, default=False, server_default="0")
+    # Incrémenté à chaque reset de mot de passe / changement d'email confirmé :
+    # invalide les JWT émis avant (le token porte la version, vérifiée au login check).
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

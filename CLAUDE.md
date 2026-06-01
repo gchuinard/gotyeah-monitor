@@ -24,6 +24,8 @@ python -m alembic revision --autogenerate -m "<msg>"   # new migration
 
 The API auto-runs migrations on container start via `entrypoint.sh` (prod only) — manual `alembic upgrade` is only needed outside Docker.
 
+In **dev**, no migrations run (`Dockerfile` starts uvicorn directly); the schema comes from `Base.metadata.create_all`, gated behind `DEBUG=true` in `database.py:init_db`. `create_all` only **creates missing tables**, never adds a column to an existing one. So after adding/altering a model column, recreate the dev volume: `docker compose -f docker-compose.dev.yml down -v` (dev data is disposable). Prod is unaffected — Alembic handles column adds with `_column_exists` guards.
+
 ### Full stack
 ```bash
 docker compose -f docker-compose.dev.yml up --build   # API:8000 · front:5173 · MySQL:3307 · Mailpit UI:8025

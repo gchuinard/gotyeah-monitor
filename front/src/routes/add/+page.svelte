@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+	import { apiFetch } from '$lib/utils/api';
 
 	let name = '';
 	let url = '';
@@ -16,15 +15,9 @@
 		error = null;
 
 		try {
-			const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
-			const token = stored ? (JSON.parse(stored).token as string | null) : null;
-
-			const res = await fetch(`${API_URL}/monitors`, {
+			const res = await apiFetch('/monitors', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					...(token ? { Authorization: `Bearer ${token}` } : {})
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ name, url, type, expected_status_code: expectedStatusCode })
 			});
 

@@ -2,8 +2,7 @@
 	import { auth } from '$lib/stores/auth';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+	import { apiFetch } from '$lib/utils/api';
 
 	type Monitor = {
 		id: number;
@@ -36,6 +35,8 @@
 
 	let confirmModal: ConfirmModal | null = null;
 	let confirmText = '';
+	let deleting = false;
+	let actionError: string | null = null;
 
 	type EditModal = {
 		monitorId: number;
@@ -53,15 +54,12 @@
 	async function fetchUsers() {
 		loading = true;
 		error = null;
-		const token = $auth.token;
-		if (!token) {
+		if (!$auth.token) {
 			await goto('/login');
 			return;
 		}
 		try {
-			const res = await fetch(`${API_URL}/admin/users`, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
+			const res = await apiFetch('/admin/users');
 			if (res.status === 403) {
 				error = "Accès refusé. Vous n'êtes pas administrateur.";
 				return;
@@ -82,11 +80,13 @@
 	function askDelete(monitor: Monitor, userEmail: string) {
 		confirmModal = { kind: 'monitor', monitorId: monitor.id, monitorName: monitor.name, userEmail };
 		confirmText = '';
+		actionError = null;
 	}
 
 	function askDeleteUser(user: UserWithMonitors) {
 		confirmModal = { kind: 'user', userId: user.id, userEmail: user.email };
 		confirmText = '';
+		actionError = null;
 	}
 
 	function openEdit(monitor: Monitor, userId: number) {
@@ -105,11 +105,10 @@
 		if (!editModal) return;
 		editSaving = true;
 		editError = null;
-		const token = $auth.token;
 		try {
-			const res = await fetch(`${API_URL}/admin/monitors/${editModal.monitorId}`, {
+			const res = await apiFetch(`/admin/monitors/${editModal.monitorId}`, {
 				method: 'PUT',
-				headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: editModal.name,
 					url: editModal.url,
@@ -133,29 +132,32 @@
 
 	async function confirmDelete() {
 		if (!confirmModal) return;
-		const token = $auth.token;
 		const modal = confirmModal;
-		confirmModal = null;
+		deleting = true;
+		actionError = null;
+		try {
+			const path =
+				modal.kind === 'monitor'
+					? `/admin/monitors/${modal.monitorId}`
+					: `/admin/users/${modal.userId}`;
+			const res = await apiFetch(path, { method: 'DELETE' });
+			if (!res.ok) throw new Error(`Échec de la suppression (HTTP ${res.status}).`);
 
-		if (modal.kind === 'monitor') {
-			const res = await fetch(`${API_URL}/admin/monitors/${modal.monitorId}`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			if (res.ok) {
+			if (modal.kind === 'monitor') {
 				users = users.map((u) => ({
 					...u,
 					monitors: u.monitors.filter((m) => m.id !== modal.monitorId)
 				}));
-			}
-		} else {
-			const res = await fetch(`${API_URL}/admin/users/${modal.userId}`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			if (res.ok) {
+			} else {
 				users = users.filter((u) => u.id !== modal.userId);
 			}
+			confirmModal = null;
+			confirmText = '';
+		} catch (err) {
+			// On garde la modale ouverte pour permettre de réessayer.
+			actionError = err instanceof Error ? err.message : 'Erreur inconnue';
+		} finally {
+			deleting = false;
 		}
 	}
 
@@ -550,13 +552,22 @@
 					/>
 				</label>
 			</div>
+			{#if actionError}
+				<div
+					class="text-sm text-rose-600 bg-rose-50 dark:bg-rose-900/30 border border-rose-200/80 dark:border-rose-500/40 rounded-xl px-3 py-2"
+				>
+					{actionError}
+				</div>
+			{/if}
 			<div class="flex gap-3 justify-end">
 				<button
 					type="button"
 					class="btn btn-sm btn-secondary"
+					disabled={deleting}
 					on:click={() => {
 						confirmModal = null;
 						confirmText = '';
+						actionError = null;
 					}}
 				>
 					Annuler
@@ -565,11 +576,12 @@
 					type="button"
 					class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50"
 					on:click={confirmDelete}
-					disabled={confirmModal.kind === 'monitor'
-						? confirmText !== confirmModal.monitorName
-						: confirmText !== 'supprimer'}
+					disabled={deleting ||
+						(confirmModal.kind === 'monitor'
+							? confirmText !== confirmModal.monitorName
+							: confirmText !== 'supprimer')}
 				>
-					Supprimer
+					{deleting ? 'Suppression...' : 'Supprimer'}
 				</button>
 			</div>
 		</div>

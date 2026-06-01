@@ -38,5 +38,14 @@ async def init_db() -> None:
     # Import ici pour éviter les imports circulaires
     import models  # noqa: F401
 
+    # En prod, le schéma est géré EXCLUSIVEMENT par Alembic (entrypoint.sh) pour
+    # éviter une double autorité. create_all ne sert qu'en dev, où aucune
+    # migration n'est lancée (le Dockerfile dev démarre uvicorn directement).
+    # ⚠️ create_all ne fait que CRÉER les tables manquantes : il n'ajoute pas une
+    # colonne à une table existante. Après l'ajout d'une colonne au modèle,
+    # recréer le volume dev : `docker compose -f docker-compose.dev.yml down -v`.
+    if os.getenv("DEBUG", "false").lower() != "true":
+        return
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -2,8 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { get } from 'svelte/store';
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+	import { onMount } from 'svelte';
+	import { apiFetch } from '$lib/utils/api';
 
 	let id = Number(get(page).params.id);
 
@@ -20,14 +20,7 @@
 		loading = true;
 		error = null;
 		try {
-			const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
-			const token = stored ? (JSON.parse(stored).token as string | null) : null;
-
-			const res = await fetch(`${API_URL}/monitors/${id}`, {
-				headers: {
-					...(token ? { Authorization: `Bearer ${token}` } : {})
-				}
-			});
+			const res = await apiFetch(`/monitors/${id}`);
 			if (!res.ok) {
 				const text = await res.text().catch(() => '');
 				throw new Error(text || `HTTP ${res.status}`);
@@ -44,21 +37,15 @@
 		}
 	}
 
-	loadMonitor();
+	onMount(loadMonitor);
 
 	async function onSubmit() {
 		submitting = true;
 		error = null;
 		try {
-			const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
-			const token = stored ? (JSON.parse(stored).token as string | null) : null;
-
-			const res = await fetch(`${API_URL}/monitors/${id}`, {
+			const res = await apiFetch(`/monitors/${id}`, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					...(token ? { Authorization: `Bearer ${token}` } : {})
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name,
 					url,

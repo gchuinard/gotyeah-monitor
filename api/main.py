@@ -17,13 +17,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from database import AsyncSessionLocal, init_db
 import models
+from rate_limit import limiter
 from routers import monitors
 from routers import admin
 from auth import router as auth_router
 
 app = FastAPI(redirect_slashes=False)
+
+# Rate limiting (anti brute-force / abus d'envoi d'emails) — voir auth.py pour les routes décorées.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"

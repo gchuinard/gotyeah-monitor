@@ -4,7 +4,7 @@ import hashlib
 import os
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 import models
 import schemas
+from rate_limit import limiter
 from mail_service import (
     send_verification_email,
     send_password_reset_email,
     send_email_change_confirm,
     send_email_change_cancel,
+    send_account_exists_notice,
 )
 
 
@@ -80,6 +82,13 @@ def get_legacy_password_hash(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
+def _hash_token(token: str) -> str:
+    # Les tokens (vérif email, reset, changement d'email) sont des secrets porteurs :
+    # on ne stocke que leur SHA-256 (64 hex) pour qu'un dump DB soit inexploitable.
+    # token_urlsafe(32) a assez d'entropie pour se passer de sel.
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
@@ -109,13 +118,17 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: Optional[int] = payload.get("sub")
-        if user_id is None:
+        token_version = payload.get("tv")
+        if user_id is None or token_version is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     user = await db.get(models.User, int(user_id))
     if user is None:
+        raise credentials_exception
+    # Invalide les tokens émis avant un reset de mot de passe / changement d'email.
+    if user.token_version != token_version:
         raise credentials_exception
     return user
 
@@ -126,15 +139,38 @@ async def read_me(current_user: models.User = Depends(get_current_user)) -> sche
 
 
 @router.post("/register", response_model=schemas.MessageResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def register_user(
-    payload: schemas.UserCreate, db: AsyncSession = Depends(get_db)
+    request: Request,
+    payload: schemas.UserCreate,
+    db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
+    # Réponse générique identique quel que soit l'état du compte (anti-énumération).
+    generic = schemas.MessageResponse(
+        message="Compte créé. Vérifiez votre email pour activer votre compte."
+    )
+    expires = datetime.now(timezone.utc) + timedelta(hours=24)
+
     existing = await get_user_by_email(db, payload.email)
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
+        if not existing.is_verified:
+            # Renvoie un lien de vérification frais (les anciens sont invalidés).
+            old = await db.execute(
+                select(models.EmailVerification).where(
+                    models.EmailVerification.user_id == existing.id
+                )
+            )
+            for v in old.scalars().all():
+                await db.delete(v)
+            token = secrets.token_urlsafe(32)
+            db.add(models.EmailVerification(
+                user_id=existing.id, token=_hash_token(token), expires_at=expires
+            ))
+            await send_verification_email(existing.email, token)
+        else:
+            await send_account_exists_notice(existing.email)
+        await db.commit()
+        return generic
 
     user = models.User(
         email=payload.email,
@@ -145,18 +181,14 @@ async def register_user(
     await db.flush()
 
     token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc) + timedelta(hours=24)
-    verification = models.EmailVerification(
-        user_id=user.id,
-        token=token,
-        expires_at=expires,
-    )
-    db.add(verification)
+    db.add(models.EmailVerification(
+        user_id=user.id, token=_hash_token(token), expires_at=expires
+    ))
 
     await send_verification_email(user.email, token)
     await db.commit()
 
-    return schemas.MessageResponse(message="Compte créé. Vérifiez votre email pour activer votre compte.")
+    return generic
 
 
 @router.get("/verify-email", response_model=schemas.MessageResponse)
@@ -165,7 +197,9 @@ async def verify_email(
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     result = await db.execute(
-        select(models.EmailVerification).where(models.EmailVerification.token == token)
+        select(models.EmailVerification).where(
+            models.EmailVerification.token == _hash_token(token)
+        )
     )
     verification = result.scalars().first()
 
@@ -198,7 +232,9 @@ async def verify_email(
 
 
 @router.post("/forgot-password", response_model=schemas.MessageResponse)
+@limiter.limit("5/minute")
 async def forgot_password(
+    request: Request,
     payload: schemas.ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
@@ -217,7 +253,7 @@ async def forgot_password(
         expires = datetime.now(timezone.utc) + timedelta(hours=1)
         reset_token = models.PasswordResetToken(
             user_id=user.id,
-            token=token,
+            token=_hash_token(token),
             expires_at=expires,
         )
         db.add(reset_token)
@@ -230,13 +266,15 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=schemas.MessageResponse)
+@limiter.limit("10/minute")
 async def reset_password(
+    request: Request,
     payload: schemas.ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.PasswordResetToken).where(
-            models.PasswordResetToken.token == payload.token
+            models.PasswordResetToken.token == _hash_token(payload.token)
         )
     )
     reset_token = result.scalars().first()
@@ -263,6 +301,7 @@ async def reset_password(
         )
 
     user.hashed_password = get_password_hash(payload.new_password)
+    user.token_version += 1  # invalide les sessions ouvertes avant le reset
     await db.delete(reset_token)
     await db.commit()
 
@@ -343,8 +382,8 @@ async def change_email(
         user_id=current_user.id,
         old_email=current_user.email,
         new_email=str(payload.new_email),
-        confirm_token=confirm_token,
-        cancel_token=cancel_token,
+        confirm_token=_hash_token(confirm_token),
+        cancel_token=_hash_token(cancel_token),
         expires_at=expires,
     )
     db.add(change_req)
@@ -365,7 +404,7 @@ async def confirm_email_change(
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.EmailChangeRequest).where(
-            models.EmailChangeRequest.confirm_token == token
+            models.EmailChangeRequest.confirm_token == _hash_token(token)
         )
     )
     req = result.scalars().first()
@@ -383,6 +422,7 @@ async def confirm_email_change(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Utilisateur introuvable.")
 
     user.email = req.new_email
+    user.token_version += 1  # invalide les sessions ouvertes avant le changement d'email
     req.confirmed = True
     await db.commit()
 
@@ -396,7 +436,7 @@ async def cancel_email_change(
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.EmailChangeRequest).where(
-            models.EmailChangeRequest.cancel_token == token
+            models.EmailChangeRequest.cancel_token == _hash_token(token)
         )
     )
     req = result.scalars().first()
@@ -420,7 +460,9 @@ async def cancel_email_change(
 
 
 @router.post("/login", response_model=schemas.Token)
+@limiter.limit("10/minute")
 async def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> schemas.Token:
@@ -443,5 +485,7 @@ async def login_for_access_token(
         user.hashed_password = get_password_hash(form_data.password)
         await db.commit()
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    access_token = create_access_token(
+        data={"sub": str(user.id), "tv": user.token_version}
+    )
     return schemas.Token(access_token=access_token)
