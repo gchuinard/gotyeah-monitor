@@ -62,6 +62,11 @@ class Monitor(Base):
     user = relationship("User", back_populates="monitors")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
 
+    # Non mappés (pas des colonnes) : remplis à la lecture par le routeur via une
+    # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
+    uptime_24h = None
+    uptime_7d = None
+
 
 class MonitorCheck(Base):
     __tablename__ = "monitor_checks"

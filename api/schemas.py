@@ -65,6 +65,9 @@ class MonitorRead(MonitorBase):
     expected_status_code: int
     last_status_code: Optional[int] = None
     ssl_expiry_at: Optional[datetime] = None
+    # Pourcentage de disponibilité (None si aucun check sur la fenêtre).
+    uptime_24h: Optional[float] = None
+    uptime_7d: Optional[float] = None
     created_at: datetime
 
     class Config:
