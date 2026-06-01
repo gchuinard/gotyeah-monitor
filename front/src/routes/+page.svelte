@@ -2,13 +2,12 @@
 	import { monitors, type CheckEntry } from '$lib/stores/monitors';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
+	import { apiFetch } from '$lib/utils/api';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 	import { onMount } from 'svelte';
 	import { goto, preloadCode } from '$app/navigation';
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 	type MonitorFromApi = {
 		id: number;
@@ -57,12 +56,9 @@
 		addSubmitting = true;
 		addError = null;
 		try {
-			const res = await fetch(`${API_URL}/monitors`, {
+			const res = await apiFetch('/monitors', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${authState.token}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: addName,
 					url: addUrl,
@@ -129,23 +125,20 @@
 		profileEmailError = null;
 		profileEmailSuccess = null;
 		try {
-			const res = await fetch(`${API_URL}/auth/change-email`, {
+			const res = await apiFetch('/auth/change-email', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${authState.token}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ new_email: profileNewEmail })
 			});
-			const data = await res.json();
 			if (!res.ok) {
-				profileEmailError = data.detail || 'Erreur lors de la demande.';
+				profileEmailError = await parseApiError(res, 'changement email');
 			} else {
+				const data = await res.json();
 				profileEmailSuccess = data.message;
 				profileNewEmail = '';
 			}
-		} catch {
-			profileEmailError = 'Impossible de contacter le serveur.';
+		} catch (e) {
+			profileEmailError = parseNetworkError(e, 'changement email');
 		} finally {
 			profileEmailSubmitting = false;
 		}
@@ -154,10 +147,7 @@
 	async function deleteAccount() {
 		profileDeleting = true;
 		try {
-			const res = await fetch(`${API_URL}/auth/me`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${authState.token}` }
-			});
+			const res = await apiFetch('/auth/me', { method: 'DELETE' });
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			clearAuth();
 			goto('/login');
@@ -173,12 +163,9 @@
 		profilePasswordError = null;
 		profilePasswordSuccess = null;
 		try {
-			const res = await fetch(`${API_URL}/auth/me`, {
+			const res = await apiFetch('/auth/me', {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${authState.token}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ password: profilePassword })
 			});
 
@@ -199,11 +186,9 @@
 		goto('/login');
 	}
 
-	async function fetchHistory(monitorId: number): Promise<CheckEntry[]> {
+	async function fetchHistory(monitorId: number, signal?: AbortSignal): Promise<CheckEntry[]> {
 		try {
-			const res = await fetch(`${API_URL}/monitors/${monitorId}/history`, {
-				headers: { Authorization: `Bearer ${authState.token}` }
-			});
+			const res = await apiFetch(`/monitors/${monitorId}/history`, { signal });
 			if (!res.ok) return [];
 			return (await res.json()) as CheckEntry[];
 		} catch {
@@ -211,7 +196,15 @@
 		}
 	}
 
+	// Annule un rafraîchissement en cours si un nouveau démarre (évite les courses).
+	let monitorsAbort: AbortController | null = null;
+
 	async function fetchMonitors() {
+		monitorsAbort?.abort();
+		const controller = new AbortController();
+		monitorsAbort = controller;
+		const { signal } = controller;
+
 		loading = true;
 		error = null;
 		const minDelay = new Promise((r) => setTimeout(r, 1000));
@@ -221,11 +214,7 @@
 				return;
 			}
 
-			const res = await fetch(`${API_URL}/monitors`, {
-				headers: {
-					Authorization: `Bearer ${authState.token}`
-				}
-			});
+			const res = await apiFetch('/monitors', { signal });
 
 			if (!res.ok) {
 				throw new Error(await parseApiError(res, 'chargement des monitors'));
@@ -234,7 +223,8 @@
 			const data = (await res.json()) as MonitorFromApi[];
 
 			// Récupère l'historique de chaque monitor en parallèle
-			const histories = await Promise.all(data.map((m) => fetchHistory(m.id)));
+			const histories = await Promise.all(data.map((m) => fetchHistory(m.id, signal)));
+			if (signal.aborted) return;
 
 			monitors.set(
 				data.map((m, i) => ({
@@ -253,19 +243,19 @@
 				}))
 			);
 		} catch (err) {
+			if ((err as Error)?.name === 'AbortError') return;
 			error = parseNetworkError(err, 'chargement des monitors');
 		} finally {
 			await minDelay;
-			loading = false;
+			// Ne touche loading que si ce rafraîchissement est toujours le plus récent.
+			if (monitorsAbort === controller) loading = false;
 		}
 	}
 
 	async function checkAdmin() {
 		if (!authState?.token) return;
 		try {
-			const res = await fetch(`${API_URL}/admin/check`, {
-				headers: { Authorization: `Bearer ${authState.token}` }
-			});
+			const res = await apiFetch('/admin/check');
 			if (res.ok) {
 				const data = await res.json();
 				isAdmin = data.is_admin;

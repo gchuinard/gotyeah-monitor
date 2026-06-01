@@ -2,7 +2,18 @@ export async function parseApiError(res: Response, context: string): Promise<str
 	let detail = '';
 	try {
 		const body = await res.json();
-		detail = body?.detail ?? '';
+		const d = body?.detail;
+		if (typeof d === 'string') {
+			detail = d;
+		} else if (Array.isArray(d)) {
+			// FastAPI 422 : `detail` est un tableau d'objets { msg, loc, ... }.
+			detail = d
+				.map((item) => item?.msg)
+				.filter(Boolean)
+				.join(', ');
+		} else if (d != null) {
+			detail = typeof d === 'object' ? JSON.stringify(d) : String(d);
+		}
 	} catch {
 		try {
 			detail = await res.text();

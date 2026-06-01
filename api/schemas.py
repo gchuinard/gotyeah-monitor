@@ -1,7 +1,12 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
+
+# Borne haute sur le mot de passe : Argon2 n'a pas de limite, mais hacher une
+# valeur énorme est un vecteur de DoS (coût CPU). 8 mini = minimum raisonnable.
+PASSWORD_MIN = 8
+PASSWORD_MAX = 128
 
 
 class UserBase(BaseModel):
@@ -9,12 +14,12 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
 
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    password: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
 
 
 class UserRead(UserBase):
@@ -31,17 +36,17 @@ class Token(BaseModel):
 
 
 class MonitorBase(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     url: HttpUrl
-    type: str = "http"
+    type: Literal["http", "ping", "port"] = "http"
 
 
 class MonitorCreate(MonitorBase):
-    expected_status_code: int = 200
+    expected_status_code: int = Field(default=200, ge=100, le=599)
 
 
 class MonitorUpdate(MonitorBase):
-    expected_status_code: int = 200
+    expected_status_code: int = Field(default=200, ge=100, le=599)
 
 
 class MonitorRead(MonitorBase):
@@ -82,7 +87,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
 
 
 class ChangeEmailRequest(BaseModel):

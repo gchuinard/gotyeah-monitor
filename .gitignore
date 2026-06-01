@@ -10,6 +10,9 @@ yarn-error.log*
 # Env files
 .env
 .env.*
+# ... sauf les templates d'exemple (sans secrets), qui sont versionnés
+!.env.example
+!.env.dev.example
 
 # OS
 .DS_Store

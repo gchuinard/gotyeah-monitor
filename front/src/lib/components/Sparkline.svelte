@@ -124,7 +124,7 @@
 	</defs>
 
 	<!-- Grille Y -->
-	{#each gridLines as gl (gl.label)}
+	{#each gridLines as gl, i (i)}
 		<line
 			x1={pad.left}
 			y1={gl.y}

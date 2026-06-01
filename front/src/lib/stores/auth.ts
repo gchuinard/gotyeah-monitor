@@ -12,7 +12,19 @@ export type AuthState = {
 
 const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('auth') : null;
 
-const initial: AuthState = stored ? JSON.parse(stored) : { token: null, user: null };
+// JSON.parse protégé : une valeur corrompue ne doit pas faire planter le module
+// (et donc toute l'app) au chargement.
+let initial: AuthState = { token: null, user: null };
+if (stored) {
+	try {
+		const parsed = JSON.parse(stored);
+		if (parsed && typeof parsed === 'object') {
+			initial = { token: parsed.token ?? null, user: parsed.user ?? null };
+		}
+	} catch {
+		if (typeof localStorage !== 'undefined') localStorage.removeItem('auth');
+	}
+}
 
 export const auth = writable<AuthState>(initial);
 
