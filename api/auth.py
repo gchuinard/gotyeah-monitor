@@ -4,9 +4,11 @@ import hashlib
 import os
 import secrets
 
+import jwt
+from jwt import PyJWTError
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,7 +123,7 @@ async def get_current_user(
         token_version = payload.get("tv")
         if user_id is None or token_version is None:
             raise credentials_exception
-    except JWTError:
+    except PyJWTError:
         raise credentials_exception
 
     user = await db.get(models.User, int(user_id))

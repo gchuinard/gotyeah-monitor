@@ -1,14 +1,12 @@
 <script lang="ts">
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
-	import { auth } from '$lib/stores/auth';
+	import { apiFetch } from '$lib/utils/api';
 	import type { MonitorCardData } from '$lib/stores/monitors';
 
 	export let monitor: MonitorCardData;
 	export let onClose: () => void;
 	export let onDeleted: () => void;
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 	let mode = 1;
 	let deleting = false;
@@ -37,12 +35,9 @@
 		submitting = true;
 		editError = null;
 		try {
-			const res = await fetch(`${API_URL}/monitors/${monitor.id}`, {
+			const res = await apiFetch(`/monitors/${monitor.id}`, {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${$auth.token ?? ''}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: editName,
 					url: editUrl,
@@ -119,10 +114,7 @@
 		if (deleting) return;
 		deleting = true;
 		try {
-			const res = await fetch(`${API_URL}/monitors/${monitor.id}`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${$auth.token ?? ''}` }
-			});
+			const res = await apiFetch(`/monitors/${monitor.id}`, { method: 'DELETE' });
 			if (!res.ok && res.status !== 204)
 				throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
 			onClose();

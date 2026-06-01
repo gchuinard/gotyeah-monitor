@@ -20,7 +20,14 @@ DATABASE_URL = (
     f"mysql+asyncmy://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    # MySQL ferme les connexions inactives (wait_timeout, 8h par défaut) : on les
+    # recycle avant pour éviter les "MySQL server has gone away" sur un Pi peu sollicité.
+    pool_recycle=1800,
+)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

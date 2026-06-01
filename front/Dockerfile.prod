@@ -1,10 +1,10 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
-# Installer les dépendances
+# Installer les dépendances (npm ci = reproductible depuis le lockfile, comme la CI)
 COPY package*.json ./
-RUN npm install --production=false
+RUN npm ci
 
 # Copier le code
 COPY . .

@@ -52,6 +52,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 CHECK_INTERVAL_SECONDS = 600
 HISTORY_RETENTION_DAYS = 7
+MAX_CONCURRENT_CHECKS = 10
 
 logger = logging.getLogger("monitor")
 
@@ -120,9 +121,9 @@ async def check_ssl_expiry(url: str) -> Optional[datetime]:
     return await loop.run_in_executor(None, _fetch_ssl_expiry, hostname, port)
 
 
-async def check_single_monitor(
-    monitor: models.Monitor, client: httpx.AsyncClient, session: AsyncSession
-) -> None:
+async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> dict:
+    """Effectue le check réseau SANS toucher la session (sûr à lancer en parallèle).
+    Renvoie le résultat ; l'application en base se fait séquentiellement ensuite."""
     start = asyncio.get_event_loop().time()
     status_code: int | None = None
     latency_ms: int | None = None
@@ -131,8 +132,10 @@ async def check_single_monitor(
 
     if await url_is_safe(monitor.url):
         try:
-            response = await client.get(monitor.url, timeout=10.0)
-            status_code = response.status_code
+            # On ne lit PAS le corps (stream) : seul le code de statut compte, ce qui
+            # évite de charger en mémoire une réponse énorme (protection OOM sur le Pi).
+            async with client.stream("GET", monitor.url, timeout=10.0) as response:
+                status_code = response.status_code
             latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
             new_status = "up" if status_code == monitor.expected_status_code else "down"
         except Exception:
@@ -146,19 +149,66 @@ async def check_single_monitor(
             monitor.url,
         )
 
-    now = datetime.now(timezone.utc)
-    monitor.status = new_status
-    monitor.last_latency_ms = latency_ms
-    monitor.last_status_code = status_code
-    monitor.last_checked_at = now
-    monitor.ssl_expiry_at = ssl_expiry
+    return {
+        "status": new_status,
+        "status_code": status_code,
+        "latency_ms": latency_ms,
+        "ssl_expiry": ssl_expiry,
+    }
 
+
+def apply_check_result(
+    monitor: models.Monitor, result: dict, now: datetime, session: AsyncSession
+) -> None:
+    monitor.status = result["status"]
+    monitor.last_latency_ms = result["latency_ms"]
+    monitor.last_status_code = result["status_code"]
+    monitor.last_checked_at = now
+    monitor.ssl_expiry_at = result["ssl_expiry"]
     session.add(models.MonitorCheck(
         monitor_id=monitor.id,
-        status=new_status,
-        latency_ms=latency_ms,
+        status=result["status"],
+        latency_ms=result["latency_ms"],
         checked_at=now,
     ))
+
+
+async def _run_one_cycle(client: httpx.AsyncClient) -> None:
+    # Nettoyage de rétention dans SA PROPRE transaction : un échec des checks ne
+    # doit pas annuler le nettoyage, et inversement.
+    try:
+        async with AsyncSessionLocal() as session:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=HISTORY_RETENTION_DAYS)
+            await session.execute(
+                delete(models.MonitorCheck).where(models.MonitorCheck.checked_at < cutoff)
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Échec du nettoyage de rétention")
+
+    async with AsyncSessionLocal() as session:
+        try:
+            result = await session.execute(select(models.Monitor))
+            all_monitors = list(result.scalars().all())
+
+            # Checks réseau en parallèle (bornés), puis application séquentielle en base
+            # (la session async n'est jamais utilisée de façon concurrente).
+            sem = asyncio.Semaphore(MAX_CONCURRENT_CHECKS)
+
+            async def _probe(m: models.Monitor) -> dict:
+                async with sem:
+                    return await probe_monitor(m, client)
+
+            results = await asyncio.gather(*[_probe(m) for m in all_monitors])
+
+            now = datetime.now(timezone.utc)
+            for monitor, res in zip(all_monitors, results):
+                apply_check_result(monitor, res, now, session)
+
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("Échec de l'itération de monitoring (rollback)")
 
 
 async def monitor_loop() -> None:
@@ -166,33 +216,10 @@ async def monitor_loop() -> None:
     # le contrôle anti-SSRF fait sur l'URL d'origine.
     async with httpx.AsyncClient(follow_redirects=False) as client:
         while True:
-            # Une itération ne doit jamais tuer la boucle : on isole chaque cycle.
             try:
-                async with AsyncSessionLocal() as session:
-                    try:
-                        # Cleanup: supprimer les checks de plus de 7 jours
-                        cutoff = datetime.now(timezone.utc) - timedelta(
-                            days=HISTORY_RETENTION_DAYS
-                        )
-                        await session.execute(
-                            delete(models.MonitorCheck).where(
-                                models.MonitorCheck.checked_at < cutoff
-                            )
-                        )
-
-                        result = await session.execute(select(models.Monitor))
-                        all_monitors = result.scalars().all()
-
-                        for monitor in all_monitors:
-                            await check_single_monitor(monitor, client, session)
-
-                        await session.commit()
-                    except Exception:
-                        await session.rollback()
-                        logger.exception("Échec de l'itération de monitoring (rollback)")
+                await _run_one_cycle(client)
             except Exception:
                 logger.exception("Erreur inattendue dans la boucle de monitoring")
-
             await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 

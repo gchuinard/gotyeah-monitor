@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -57,6 +57,10 @@ class Monitor(Base):
 
 class MonitorCheck(Base):
     __tablename__ = "monitor_checks"
+    # Index composite pour la requête d'historique (WHERE monitor_id=? ORDER BY checked_at).
+    __table_args__ = (
+        Index("ix_monitor_checks_monitor_id_checked_at", "monitor_id", "checked_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     monitor_id = Column(

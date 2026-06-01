@@ -186,9 +186,9 @@
 		goto('/login');
 	}
 
-	async function fetchHistory(monitorId: number): Promise<CheckEntry[]> {
+	async function fetchHistory(monitorId: number, signal?: AbortSignal): Promise<CheckEntry[]> {
 		try {
-			const res = await apiFetch(`/monitors/${monitorId}/history`);
+			const res = await apiFetch(`/monitors/${monitorId}/history`, { signal });
 			if (!res.ok) return [];
 			return (await res.json()) as CheckEntry[];
 		} catch {
@@ -196,7 +196,15 @@
 		}
 	}
 
+	// Annule un rafraîchissement en cours si un nouveau démarre (évite les courses).
+	let monitorsAbort: AbortController | null = null;
+
 	async function fetchMonitors() {
+		monitorsAbort?.abort();
+		const controller = new AbortController();
+		monitorsAbort = controller;
+		const { signal } = controller;
+
 		loading = true;
 		error = null;
 		const minDelay = new Promise((r) => setTimeout(r, 1000));
@@ -206,7 +214,7 @@
 				return;
 			}
 
-			const res = await apiFetch('/monitors');
+			const res = await apiFetch('/monitors', { signal });
 
 			if (!res.ok) {
 				throw new Error(await parseApiError(res, 'chargement des monitors'));
@@ -215,7 +223,8 @@
 			const data = (await res.json()) as MonitorFromApi[];
 
 			// Récupère l'historique de chaque monitor en parallèle
-			const histories = await Promise.all(data.map((m) => fetchHistory(m.id)));
+			const histories = await Promise.all(data.map((m) => fetchHistory(m.id, signal)));
+			if (signal.aborted) return;
 
 			monitors.set(
 				data.map((m, i) => ({
@@ -234,10 +243,12 @@
 				}))
 			);
 		} catch (err) {
+			if ((err as Error)?.name === 'AbortError') return;
 			error = parseNetworkError(err, 'chargement des monitors');
 		} finally {
 			await minDelay;
-			loading = false;
+			// Ne touche loading que si ce rafraîchissement est toujours le plus récent.
+			if (monitorsAbort === controller) loading = false;
 		}
 	}
 
