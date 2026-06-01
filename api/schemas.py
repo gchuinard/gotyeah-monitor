@@ -17,14 +17,22 @@ class UserCreate(UserBase):
     password: str = Field(min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
 
 
+WebhookKind = Literal["discord", "slack", "ntfy", "generic"]
+
+
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
+    # "" pour effacer le webhook ; None = champ non fourni (pas de changement).
+    alert_webhook_url: Optional[str] = Field(default=None, max_length=512)
+    alert_webhook_kind: Optional[WebhookKind] = None
 
 
 class UserRead(UserBase):
     id: int
     created_at: datetime
+    alert_webhook_url: Optional[str] = None
+    alert_webhook_kind: Optional[str] = None
 
     class Config:
         from_attributes = True

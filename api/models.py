@@ -15,6 +15,9 @@ class User(Base):
     # Incrémenté à chaque reset de mot de passe / changement d'email confirmé :
     # invalide les JWT émis avant (le token porte la version, vérifiée au login check).
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # Canal d'alerte optionnel (en plus de l'email) : Discord / Slack / ntfy / générique.
+    alert_webhook_url = Column(String(512), nullable=True)
+    alert_webhook_kind = Column(String(20), nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -46,6 +49,11 @@ class Monitor(Base):
     last_latency_ms = Column(Integer, nullable=True)
     last_checked_at = Column(DateTime(timezone=True), nullable=True)
     ssl_expiry_at = Column(DateTime(timezone=False), nullable=True)
+    # État pour l'alerting (anti-flapping + non-répétition)
+    consecutive_failures = Column(Integer, nullable=False, default=0, server_default="0")
+    down_alert_sent = Column(Boolean, nullable=False, default=False, server_default="0")
+    down_since = Column(DateTime(timezone=True), nullable=True)
+    ssl_alert_level = Column(Integer, nullable=True)  # dernier palier SSL (jours) alerté
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

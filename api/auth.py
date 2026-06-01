@@ -343,6 +343,12 @@ async def update_me(
     if payload.password:
         current_user.hashed_password = get_password_hash(payload.password)
 
+    # Config webhook d'alerte : "" => effacer, valeur => définir, None => ne pas toucher.
+    if payload.alert_webhook_url is not None:
+        url = payload.alert_webhook_url.strip()
+        current_user.alert_webhook_url = url or None
+        current_user.alert_webhook_kind = (payload.alert_webhook_kind or None) if url else None
+
     await db.commit()
     await db.refresh(current_user)
     return current_user

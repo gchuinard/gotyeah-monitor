@@ -12,6 +12,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,6 +24,7 @@ from slowapi.errors import RateLimitExceeded
 from database import AsyncSessionLocal, init_db
 import models
 from rate_limit import limiter
+from notifications import evaluate_alerts, dispatch_alerts
 from routers import monitors
 from routers import admin
 from auth import router as auth_router
@@ -188,7 +190,10 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
 
     async with AsyncSessionLocal() as session:
         try:
-            result = await session.execute(select(models.Monitor))
+            # selectinload(user) : la boucle a besoin de l'email/webhook de l'owner pour alerter.
+            result = await session.execute(
+                select(models.Monitor).options(selectinload(models.Monitor.user))
+            )
             all_monitors = list(result.scalars().all())
 
             # Checks réseau en parallèle (bornés), puis application séquentielle en base
@@ -204,6 +209,11 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             now = datetime.now(timezone.utc)
             for monitor, res in zip(all_monitors, results):
                 apply_check_result(monitor, res, now, session)
+
+            # Alerting : détecte les transitions / SSL, envoie email+webhook, pose les
+            # drapeaux anti-répétition (persistés au commit ci-dessous).
+            alerts = evaluate_alerts(all_monitors, now)
+            await dispatch_alerts(client, alerts)
 
             await session.commit()
         except Exception:
