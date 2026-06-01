@@ -58,6 +58,11 @@ HISTORY_RETENTION_DAYS = 7
 # long terme), mais bornés pour éviter une croissance illimitée de la table.
 INCIDENT_RETENTION_DAYS = 90
 MAX_CONCURRENT_CHECKS = 10
+# La boucle est considérée "bloquée" si aucun cycle n'a abouti depuis 3 intervalles.
+LOOP_STALE_AFTER_SECONDS = CHECK_INTERVAL_SECONDS * 3
+# Dead-man switch : ping sortant à chaque cycle vers un service tiers (ex. healthchecks.io).
+# C'est un réglage opérateur (variable d'env), pas une URL utilisateur -> pas de garde SSRF.
+HEARTBEAT_URL = os.getenv("HEARTBEAT_URL", "").strip()
 
 logger = logging.getLogger("monitor")
 
@@ -227,33 +232,52 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
             logger.exception("Échec de l'itération de monitoring (rollback)")
 
 
+async def _heartbeat(client: httpx.AsyncClient) -> None:
+    """Dead-man switch : signale à un service tiers que la boucle tourne (best-effort)."""
+    if not HEARTBEAT_URL:
+        return
+    try:
+        await client.get(HEARTBEAT_URL, timeout=10.0)
+    except Exception:
+        logger.warning("Échec du ping heartbeat (dead-man switch)")
+
+
 async def monitor_loop() -> None:
     # follow_redirects=False : une redirection vers une cible interne contournerait
     # le contrôle anti-SSRF fait sur l'URL d'origine.
+    app.state.last_cycle_at = datetime.now(timezone.utc)
     async with httpx.AsyncClient(follow_redirects=False) as client:
         while True:
             try:
                 await _run_one_cycle(client)
+                # Marque la liveness : un cycle a abouti (lu par /health).
+                app.state.last_cycle_at = datetime.now(timezone.utc)
             except Exception:
                 logger.exception("Erreur inattendue dans la boucle de monitoring")
+            await _heartbeat(client)
             await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 
 def _on_monitor_task_done(task: "asyncio.Task[None]") -> None:
-    # Filet de sécurité : si la boucle meurt malgré tout, on le journalise
-    # au lieu de laisser l'exception disparaître silencieusement au GC.
-    if task.cancelled():
+    # Watchdog : si la boucle meurt malgré ses try/except internes (et hors arrêt
+    # de l'app), on journalise ET on la relance, pour qu'elle ne reste pas morte.
+    if getattr(app.state, "shutting_down", False) or task.cancelled():
         return
     exc = task.exception()
     if exc is not None:
         logger.error(
-            "La boucle de monitoring s'est arrêtée sur une exception", exc_info=exc
+            "Boucle de monitoring arrêtée sur exception — redémarrage", exc_info=exc
         )
+        new_task = asyncio.create_task(monitor_loop())
+        new_task.add_done_callback(_on_monitor_task_done)
+        app.state.monitor_task = new_task
 
 
 @app.on_event("startup")
 async def on_startup() -> None:
     await init_db()
+    app.state.shutting_down = False
+    app.state.last_cycle_at = None
     task = asyncio.create_task(monitor_loop())
     task.add_done_callback(_on_monitor_task_done)
     app.state.monitor_task = task
@@ -261,6 +285,7 @@ async def on_startup() -> None:
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    app.state.shutting_down = True
     task = getattr(app.state, "monitor_task", None)
     if task:
         task.cancel()
@@ -279,14 +304,33 @@ app.add_middleware(
 )
 
 
+def _loop_health() -> tuple[bool, dict]:
+    """Liveness réelle de la boucle de monitoring (et pas un simple 'ok' statique)."""
+    last = getattr(app.state, "last_cycle_at", None)
+    now = datetime.now(timezone.utc)
+    if last is None:
+        # Démarrage : la boucle n'a pas encore tourné -> on tolère.
+        return True, {"status": "starting", "last_cycle_at": None, "seconds_since_last_cycle": None}
+    age = (now - last).total_seconds()
+    ok = age < LOOP_STALE_AFTER_SECONDS
+    return ok, {
+        "status": "ok" if ok else "degraded",
+        "monitor_loop": "alive" if ok else "stale",
+        "last_cycle_at": last.isoformat(),
+        "seconds_since_last_cycle": round(age),
+    }
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    ok, body = _loop_health()
+    return JSONResponse(status_code=200 if ok else 503, content=body)
 
 
 @app.head("/health")
 async def health_head():
-    return
+    ok, _ = _loop_health()
+    return JSONResponse(status_code=200 if ok else 503, content=None)
 
 
 app.include_router(auth_router)
