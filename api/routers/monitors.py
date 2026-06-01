@@ -1,7 +1,8 @@
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -12,6 +13,40 @@ from auth import get_current_user
 router = APIRouter(prefix="/monitors", tags=["monitors"])
 
 
+async def _uptime_pct(
+    db: AsyncSession, monitor_ids: List[int], cutoff: datetime
+) -> Dict[int, Optional[float]]:
+    """{monitor_id: % de checks 'up'} sur la fenêtre [cutoff, now] (agrégation SQL,
+    via l'index composite (monitor_id, checked_at))."""
+    if not monitor_ids:
+        return {}
+    stmt = (
+        select(
+            models.MonitorCheck.monitor_id,
+            func.count().label("total"),
+            func.sum(case((models.MonitorCheck.status == "up", 1), else_=0)).label("up"),
+        )
+        .where(models.MonitorCheck.monitor_id.in_(monitor_ids))
+        .where(models.MonitorCheck.checked_at >= cutoff)
+        .group_by(models.MonitorCheck.monitor_id)
+    )
+    out: Dict[int, Optional[float]] = {}
+    for mid, total, up in (await db.execute(stmt)).all():
+        out[mid] = round(100.0 * (up or 0) / total, 2) if total else None
+    return out
+
+
+async def _attach_uptime(db: AsyncSession, monitors: List[models.Monitor]) -> None:
+    """Calcule et attache uptime_24h / uptime_7d sur les instances (lecture seule)."""
+    ids = [m.id for m in monitors]
+    now = datetime.now(timezone.utc)
+    u24 = await _uptime_pct(db, ids, now - timedelta(hours=24))
+    u7 = await _uptime_pct(db, ids, now - timedelta(days=7))
+    for m in monitors:
+        m.uptime_24h = u24.get(m.id)
+        m.uptime_7d = u7.get(m.id)
+
+
 @router.get("", response_model=List[schemas.MonitorRead])
 async def list_monitors(
     db: AsyncSession = Depends(get_db),
@@ -20,8 +55,9 @@ async def list_monitors(
     result = await db.execute(
         select(models.Monitor).where(models.Monitor.user_id == current_user.id)
     )
-    monitors = result.scalars().all()
-    return list(monitors)
+    monitors = list(result.scalars().all())
+    await _attach_uptime(db, monitors)
+    return monitors
 
 
 @router.post(
@@ -56,6 +92,7 @@ async def get_monitor(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     if monitor.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    await _attach_uptime(db, [monitor])
     return monitor
 
 

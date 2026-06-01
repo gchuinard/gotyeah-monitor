@@ -21,6 +21,8 @@ export type MonitorCardData = {
 	expectedStatusCode: number;
 	lastStatusCode: number | null;
 	sslExpiryAt: string | null;
+	uptime24h: number | null;
+	uptime7d: number | null;
 	createdAt: string;
 };
 

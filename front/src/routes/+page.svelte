@@ -20,6 +20,8 @@
 		expected_status_code: number;
 		last_status_code: number | null;
 		ssl_expiry_at: string | null;
+		uptime_24h: number | null;
+		uptime_7d: number | null;
 		created_at: string;
 	};
 
@@ -289,6 +291,8 @@
 					expectedStatusCode: m.expected_status_code,
 					lastStatusCode: m.last_status_code,
 					sslExpiryAt: m.ssl_expiry_at,
+					uptime24h: m.uptime_24h,
+					uptime7d: m.uptime_7d,
 					createdAt: m.created_at
 				}))
 			);

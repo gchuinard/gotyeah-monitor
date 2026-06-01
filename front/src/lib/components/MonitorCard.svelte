@@ -15,6 +15,8 @@
 	export let expectedStatusCode: number;
 	export let lastStatusCode: number | null;
 	export let sslExpiryAt: string | null = null;
+	export let uptime24h: number | null = null;
+	export let uptime7d: number | null = null;
 	export let onDeleted: (() => void) | undefined;
 	export let onToggleDetails: () => void = () => {};
 	export let showDetails = false;
@@ -64,6 +66,12 @@
 		if (lat < 150) return 'text-emerald-400';
 		if (lat < 400) return 'text-yellow-400';
 		return 'text-red-500';
+	}
+
+	function uptimeColor(pct: number) {
+		if (pct >= 99.5) return 'text-emerald-400';
+		if (pct >= 95) return 'text-yellow-400';
+		return 'text-red-400';
 	}
 </script>
 
@@ -139,6 +147,20 @@
 				on:click|stopPropagation>{url}</a
 			>
 			<span class="mt-0.5 block">{formatRelative(lastCheckedAt)}</span>
+		</div>
+	{/if}
+
+	{#if uptime24h !== null || uptime7d !== null}
+		<div class="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+			<span class="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500"
+				>Uptime</span
+			>
+			{#if uptime24h !== null}
+				<span>24h <strong class={uptimeColor(uptime24h)}>{uptime24h}%</strong></span>
+			{/if}
+			{#if uptime7d !== null}
+				<span>7j <strong class={uptimeColor(uptime7d)}>{uptime7d}%</strong></span>
+			{/if}
 		</div>
 	{/if}
 
