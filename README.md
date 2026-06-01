@@ -68,20 +68,33 @@ docker compose -f docker-compose.dev.yml up --build
 
 ### Variables d'environnement (`.env.dev`)
 
+Voir `.env.dev.example` (à copier). L'API lit les variables `DB_*` ; les `MYSQL_*` ne servent qu'à initialiser le conteneur MySQL. `ALGORITHM` et la durée du token sont des constantes dans `api/auth.py` (pas des variables d'environnement).
+
 ```env
+# Base de données — lue par l'API
+DB_HOST=db
+DB_PORT=3306
+DB_USER=monitor
+DB_PASSWORD=monitor
+DB_NAME=monitor
+
+# Initialisation du conteneur MySQL
+MYSQL_ROOT_PASSWORD=root
 MYSQL_DATABASE=monitor
 MYSQL_USER=monitor
 MYSQL_PASSWORD=monitor
-MYSQL_ROOT_PASSWORD=root
 
-SECRET_KEY=your-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
+SECRET_KEY=dev-secret-key          # en prod : ≥ 32 caractères, sinon l'API refuse de démarrer
+ADMIN_EMAILS=ton@email.com         # emails admin séparés par des virgules
 
+# Mail (MailPit en dev)
 SMTP_HOST=mailpit
 SMTP_PORT=1025
-MAIL_FROM=noreply@gotyeah.local
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=noreply@gotyeah.local
 
+FRONTEND_URL=http://localhost:5173 # base des liens dans les emails
 VITE_API_URL=http://localhost:8000
 ```
 
@@ -99,11 +112,21 @@ docker network create monitor_net
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-### Variables supplémentaires pour la prod
+### Variables pour la prod
+
+Copier `.env.example` vers `.env` et tout remplir. Points clés :
 
 ```env
+SECRET_KEY=                         # OBLIGATOIRE, ≥ 32 car. : python -c "import secrets; print(secrets.token_urlsafe(64))"
+DB_HOST=db                          # nom du service réseau (pas localhost)
+DB_USER=...
+DB_PASSWORD=...
+DB_NAME=...
+MYSQL_ROOT_PASSWORD=...             # requis pour initialiser le conteneur MySQL
 VITE_API_URL=https://api.votre-domaine.com
-# + variables SMTP réelles
+ADMIN_EMAILS=...
+FRONTEND_URL=https://votre-domaine.com
+# + variables SMTP réelles (SMTP_HOST/PORT/USER/PASSWORD/SMTP_FROM)
 ```
 
 > Un reverse proxy (Nginx, Caddy…) doit exposer les conteneurs `monitor_api_prod` (port 8000) et `monitor_front_prod` (port 80) vers l'extérieur.
