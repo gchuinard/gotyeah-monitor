@@ -344,6 +344,9 @@ async def update_me(
     if payload.password:
         current_user.hashed_password = get_password_hash(payload.password)
 
+    if payload.alert_email_enabled is not None:
+        current_user.alert_email_enabled = payload.alert_email_enabled
+
     # Config webhook d'alerte : "" => effacer, valeur => définir, None => ne pas toucher.
     if payload.alert_webhook_url is not None:
         url = payload.alert_webhook_url.strip()

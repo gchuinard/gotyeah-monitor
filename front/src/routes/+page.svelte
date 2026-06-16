@@ -109,7 +109,8 @@
 		profilePasswordValid &&
 		profilePassword === profileConfirmPassword;
 
-	// Webhook d'alerte (Notifications)
+	// Notifications (email + webhook d'alerte)
+	let profileAlertEmailEnabled = true;
 	let profileWebhookUrl = '';
 	let profileWebhookKind = 'discord';
 	let profileWebhookSubmitting = false;
@@ -124,6 +125,7 @@
 		profileConfirmPassword = '';
 		profilePasswordError = null;
 		profilePasswordSuccess = null;
+		profileAlertEmailEnabled = true;
 		profileWebhookUrl = '';
 		profileWebhookKind = 'discord';
 		profileWebhookError = null;
@@ -132,11 +134,12 @@
 		profileDeleteConfirmText = '';
 		showProfile = true;
 
-		// Pré-remplit la config webhook actuelle (best-effort).
+		// Pré-remplit la config notifications actuelle (best-effort).
 		try {
 			const res = await apiFetch('/auth/me');
 			if (res.ok) {
 				const me = await res.json();
+				profileAlertEmailEnabled = me.alert_email_enabled ?? true;
 				profileWebhookUrl = me.alert_webhook_url ?? '';
 				profileWebhookKind = me.alert_webhook_kind ?? 'discord';
 			}
@@ -145,7 +148,7 @@
 		}
 	}
 
-	async function saveWebhook() {
+	async function saveNotifications() {
 		profileWebhookSubmitting = true;
 		profileWebhookError = null;
 		profileWebhookSuccess = null;
@@ -154,19 +157,18 @@
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
+					alert_email_enabled: profileAlertEmailEnabled,
 					alert_webhook_url: profileWebhookUrl,
 					alert_webhook_kind: profileWebhookKind
 				})
 			});
 			if (!res.ok) {
-				profileWebhookError = await parseApiError(res, 'webhook');
+				profileWebhookError = await parseApiError(res, 'notifications');
 			} else {
-				profileWebhookSuccess = profileWebhookUrl.trim()
-					? 'Webhook enregistré.'
-					: 'Webhook désactivé.';
+				profileWebhookSuccess = 'Préférences de notification enregistrées.';
 			}
 		} catch (e) {
-			profileWebhookError = parseNetworkError(e, 'webhook');
+			profileWebhookError = parseNetworkError(e, 'notifications');
 		} finally {
 			profileWebhookSubmitting = false;
 		}
@@ -720,7 +722,7 @@
 		role="presentation"
 	>
 		<div
-			class="w-full max-w-sm rounded-2xl overflow-hidden
+			class="w-full max-w-lg rounded-2xl overflow-hidden
                    bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
                    shadow-[0_0_60px_rgba(56,189,248,0.25)]"
@@ -829,10 +831,10 @@
 					</div>
 				</form>
 
-				<!-- Notifications (webhook) -->
+				<!-- Notifications (email + webhook) -->
 				<form
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
-					on:submit|preventDefault={saveWebhook}
+					on:submit|preventDefault={saveNotifications}
 				>
 					<p
 						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
@@ -840,12 +842,33 @@
 						Notifications
 					</p>
 					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
-						Les alertes (panne, rétablissement, expiration SSL) sont envoyées par email. Tu peux
-						aussi recevoir un webhook.
+						Les alertes (panne, rétablissement, expiration SSL) sont envoyées par email, et en
+						option via un webhook.
 					</p>
 
+					<!-- Alertes email -->
+					<label
+						class="flex items-start gap-2.5 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5"
+					>
+						<input
+							type="checkbox"
+							class="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500 cursor-pointer"
+							bind:checked={profileAlertEmailEnabled}
+						/>
+						<span class="flex flex-col">
+							<span class="text-sm text-slate-700 dark:text-slate-200"
+								>Recevoir les alertes par email</span
+							>
+							<span class="text-xs text-slate-400 dark:text-slate-500">
+								{profileAlertEmailEnabled
+									? `Envoyées à ${authState?.user?.email ?? 'ton adresse'}`
+									: 'Désactivé — seul le webhook (si configuré) sera utilisé.'}
+							</span>
+						</span>
+					</label>
+
 					<label class="flex flex-col gap-1">
-						<span class="text-xs text-slate-500 dark:text-slate-400">Type</span>
+						<span class="text-xs text-slate-500 dark:text-slate-400">Webhook (type)</span>
 						<select
 							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
 							bind:value={profileWebhookKind}

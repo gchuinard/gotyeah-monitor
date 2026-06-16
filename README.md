@@ -108,7 +108,7 @@ VITE_API_URL=http://localhost:8000
 # HEARTBEAT_URL=
 ```
 
-> Le **webhook d'alerte** (Discord / Slack / ntfy) n'est pas une variable d'env : il se configure **par utilisateur** dans Profil → Notifications.
+> Les **alertes email** sont actives par défaut mais peuvent être coupées par utilisateur, et le **webhook d'alerte** (Discord / Slack / ntfy) s'active **par utilisateur** : tout se configure dans Profil → Notifications.
 
 ## Déploiement en production
 

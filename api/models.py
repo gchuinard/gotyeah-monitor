@@ -15,6 +15,9 @@ class User(Base):
     # Incrémenté à chaque reset de mot de passe / changement d'email confirmé :
     # invalide les JWT émis avant (le token porte la version, vérifiée au login check).
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # Alertes par email (panne / rétablissement / SSL) : activées par défaut,
+    # l'utilisateur peut les couper (ex. s'il ne veut que le webhook).
+    alert_email_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
     # Canal d'alerte optionnel (en plus de l'email) : Discord / Slack / ntfy / générique.
     alert_webhook_url = Column(String(512), nullable=True)
     alert_webhook_kind = Column(String(20), nullable=True)

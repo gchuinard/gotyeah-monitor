@@ -130,17 +130,22 @@ async def _send_webhook(client: httpx.AsyncClient, url: str, kind: Optional[str]
 
 async def _send_one(client: httpx.AsyncClient, a: _Alert) -> None:
     user = a.user
-    email_ok = False
-    try:
-        if a.kind == "down":
-            await send_monitor_down_email(user.email, a.monitor_name, a.data["status_code"], a.data["since"])
-        elif a.kind == "up":
-            await send_monitor_up_email(user.email, a.monitor_name, a.data["since"], a.data["now"])
-        elif a.kind == "ssl":
-            await send_ssl_expiry_email(user.email, a.monitor_name, a.data["days_left"])
-        email_ok = True
-    except Exception:
-        logger.exception("Échec envoi email d'alerte (%s / %s)", a.kind, a.monitor_name)
+    # Alertes email activées par défaut ; si l'utilisateur les a coupées, il n'y a
+    # rien à envoyer par email -> on considère l'email "ok" pour quand même poser le
+    # drapeau (sinon l'alerte — et le webhook — se re-déclencheraient à chaque cycle).
+    email_enabled = getattr(user, "alert_email_enabled", True)
+    email_ok = not email_enabled
+    if email_enabled:
+        try:
+            if a.kind == "down":
+                await send_monitor_down_email(user.email, a.monitor_name, a.data["status_code"], a.data["since"])
+            elif a.kind == "up":
+                await send_monitor_up_email(user.email, a.monitor_name, a.data["since"], a.data["now"])
+            elif a.kind == "ssl":
+                await send_ssl_expiry_email(user.email, a.monitor_name, a.data["days_left"])
+            email_ok = True
+        except Exception:
+            logger.exception("Échec envoi email d'alerte (%s / %s)", a.kind, a.monitor_name)
 
     # Webhook best-effort (n'influence pas le drapeau "déjà notifié")
     if user.alert_webhook_url:
