@@ -3,6 +3,27 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// Applique le thème stocké avant le premier paint (SSR désactivé, rendu
+			// client-only) → évite un flash clair/sombre au chargement.
+			try {
+				if (localStorage.getItem('theme') === 'dark') {
+					document.documentElement.classList.add('dark');
+				}
+			} catch (e) {
+				/* localStorage indisponible : on reste en clair */
+			}
+		</script>
+		<style>
+			/* Fond de marque pendant le chargement du bundle JS (CSR) : évite un
+			   écran blanc brut avant le rendu du layout. */
+			html {
+				background-color: #eef3ff;
+			}
+			html.dark {
+				background-color: #020617;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
