@@ -18,7 +18,8 @@ npm run build    # build de production
 
 ## Repères
 
-- `src/routes/` — pages (dashboard, login, register, profil, admin…). Le profil contient la config **webhook d'alerte** (Notifications).
+- Rendu **client-only** (`+layout.ts` `ssr = false`) : SPA auth-gated, le SSR provoquait un flash de page au chargement. Le thème + un fond de marque sont appliqués avant le premier paint dans `app.html`. Ne pas réactiver le SSR.
+- `src/routes/` — pages (dashboard, login, register, profil, admin…). Le popup profil (dashboard) contient la config **Notifications** : interrupteur des **alertes email** + **webhook**.
 - `src/lib/components/` — `MonitorCard` (badge **% uptime**), `MonitorDetailModal` (**journal d'incidents**), `StatusBar`, `Sparkline`, `PasswordStrength`.
 - `src/lib/stores/` — `auth`, `monitors`, `theme`, `historyWindow` (persistés en localStorage).
 - `src/lib/utils/api.ts` — `apiFetch()` : appels authentifiés (JWT) + déconnexion auto sur 401 (SSR-safe).

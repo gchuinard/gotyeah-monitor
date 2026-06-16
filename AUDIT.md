@@ -105,7 +105,7 @@ Le `.env` de prod ne contient **aucun** `MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWOR
 - `'[object Object]'` affiché sur erreur 422 de changement d'email (`+page.svelte:140-142`).
 - Pas d'`AbortController` → courses entre refresh, last-writer-wins (`+page.svelte:214-261`).
 - Le JWT n'est jamais décodé ni vérifié pour l'expiration — « a un token » = « connecté » (`+page.svelte:219-222`).
-- SSR activé sur une SPA auth-gated → flash initial / rendu redondant d'un shell déconnecté (`+layout.svelte:1-3`).
+- SSR activé sur une SPA auth-gated → flash initial / rendu redondant d'un shell déconnecté (`+layout.svelte:1-3`). — ✅ **corrigé** : `+layout.ts` `ssr = false` (rendu client-only) + thème/fond pré-paint dans `app.html` + gardes de redirection sur `/login` et `/`.
 - Logique token + fetch + gestion d'erreur dupliquée partout (pas de client API partagé) (`+page.svelte:56-276`).
 - Modal sans focus-trap, sans gestion de focus, non fermable au clavier de l'intérieur (`MonitorDetailModal.svelte:114-152`).
 

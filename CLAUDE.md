@@ -98,6 +98,14 @@ Migrations to date: `0001-0004` (initial + email flows), `0005` (`users.token_ve
 - JWT lives in `localStorage` under `auth` key (see `front/src/lib/stores/auth.ts`). Not httpOnly cookies — XSS would leak the token.
 - Stores follow a consistent localStorage-persist pattern via `writable` + `subscribe` (see `theme.ts`, `historyWindow.ts`).
 
+### Rendering is client-only (`ssr = false`) — don't re-enable SSR
+
+`front/src/routes/+layout.ts` sets `export const ssr = false`. This is deliberate: auth state (JWT) lives in `localStorage`, which **doesn't exist server-side**, so SSR rendered every page in its logged-out state and the client then corrected/redirected → a visible "wrong page" flash on load. With CSR-only the first paint already knows the real auth state. Re-enabling SSR brings the flash back. Consequences of CSR-only:
+
+- `front/src/app.html` carries an inline `<script>` that applies the stored theme (`localStorage.theme` → `.dark` on `<html>`) **and** a brand background colour **before first paint**, so the brief JS-boot window isn't a white/wrong-theme flash.
+- The two redirect routes guard their render so they never paint before navigating: `/login` (`redirecting` flag) and `/` (`class:hidden={!authState?.token}`, with `onMount` redirecting to `/login`). The always-rendered gradient in `+layout.svelte` is what shows during the redirect.
+- Prod serves this fine via `vite preview` (no prerender/adapter-static needed); the server returns the empty shell and the client renders.
+
 ### StatusBar history window is per-monitor, persisted, bucketed
 
 `front/src/lib/components/StatusBar.svelte` is used in both `MonitorCard` and `MonitorDetailModal` — both must pass `monitorId={...}`. Per-monitor choice is stored in `localStorage.historyWindowHours` as a JSON map `{monitorId: hours}` (see `front/src/lib/stores/historyWindow.ts`). Each preset has a `bucketMinutes` field so bars aggregate adaptively (10 min for ≤12h windows, up to 1 day for 7j). A bucket with both up & down checks renders yellow, no-data buckets render gray.
