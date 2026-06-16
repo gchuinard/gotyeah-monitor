@@ -52,11 +52,12 @@
 		}
 	}
 
-	const current = get(auth);
-	if (current.token) goto('/');
+	// Déjà connecté : on redirige sans jamais peindre le formulaire (anti-flash).
+	let redirecting = get(auth).token !== null;
+	if (redirecting) goto('/');
 </script>
 
-<div class="min-h-screen flex items-center justify-center py-10">
+<div class="min-h-screen flex items-center justify-center py-10" class:hidden={redirecting}>
 	<div
 		class="w-full max-w-md mx-auto p-8
            rounded-3xl bg-white/85 backdrop-blur-2xl

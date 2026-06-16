@@ -328,7 +328,11 @@
 	});
 </script>
 
-<div class="min-h-screen flex items-start justify-center pt-10 pb-12">
+<!-- Caché tant qu'on n'est pas authentifié : onMount redirige vers /login (anti-flash). -->
+<div
+	class="min-h-screen flex items-start justify-center pt-10 pb-12"
+	class:hidden={!authState?.token}
+>
 	<div
 		class="w-full max-w-6xl mx-auto
            rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
