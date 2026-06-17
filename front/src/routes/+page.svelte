@@ -25,6 +25,8 @@
 		ssl_expiry_at: string | null;
 		uptime_24h: number | null;
 		uptime_7d: number | null;
+		uptime_30d: number | null;
+		uptime_90d: number | null;
 		check_interval_seconds: number | null;
 		keyword: string | null;
 		keyword_mode: 'present' | 'absent' | null;
@@ -393,6 +395,8 @@
 					sslExpiryAt: m.ssl_expiry_at,
 					uptime24h: m.uptime_24h,
 					uptime7d: m.uptime_7d,
+					uptime30d: m.uptime_30d,
+					uptime90d: m.uptime_90d,
 					checkIntervalSeconds: m.check_interval_seconds,
 					keyword: m.keyword,
 					keywordMode: m.keyword_mode ?? 'present',

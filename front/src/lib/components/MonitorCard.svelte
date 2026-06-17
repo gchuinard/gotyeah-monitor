@@ -17,6 +17,8 @@
 	export let sslExpiryAt: string | null = null;
 	export let uptime24h: number | null = null;
 	export let uptime7d: number | null = null;
+	export let uptime30d: number | null = null;
+	export let uptime90d: number | null = null;
 	export let onDeleted: (() => void) | undefined;
 	export let onToggleDetails: () => void = () => {};
 	export let showDetails = false;
@@ -159,7 +161,7 @@
 		</div>
 	{/if}
 
-	{#if uptime24h !== null || uptime7d !== null}
+	{#if uptime24h !== null || uptime7d !== null || uptime30d !== null || uptime90d !== null}
 		<div class="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
 			<span class="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500"
 				>Uptime</span
@@ -169,6 +171,12 @@
 			{/if}
 			{#if uptime7d !== null}
 				<span>7j <strong class={uptimeColor(uptime7d)}>{uptime7d}%</strong></span>
+			{/if}
+			{#if uptime30d !== null}
+				<span>30j <strong class={uptimeColor(uptime30d)}>{uptime30d}%</strong></span>
+			{/if}
+			{#if uptime90d !== null}
+				<span>90j <strong class={uptimeColor(uptime90d)}>{uptime90d}%</strong></span>
 			{/if}
 		</div>
 	{/if}
