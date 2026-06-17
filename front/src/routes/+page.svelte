@@ -118,6 +118,33 @@
 	let newGroupName = '';
 	let groupActionError: string | null = null;
 
+	async function assignGroup(monitorId, groupId) {
+		const mon = $monitors.find((x) => x.id === monitorId);
+		if (!mon) return;
+		try {
+			await apiFetch(`/monitors/${monitorId}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: mon.name,
+					url: mon.url,
+					type: mon.type,
+					expected_status_code: mon.expectedStatusCode,
+					check_interval_seconds: mon.checkIntervalSeconds,
+					keyword: mon.keyword,
+					keyword_mode: mon.keywordMode ?? 'present',
+					latency_threshold_ms: mon.latencyThresholdMs,
+					port: mon.port,
+					group_id: groupId,
+					is_public: mon.isPublic
+				})
+			});
+			await fetchMonitors();
+		} catch {
+			/* ignore */
+		}
+	}
+
 	async function createGroup() {
 		const name = newGroupName.trim();
 		if (!name) return;
@@ -833,6 +860,8 @@
 							showDetails={openCardId === m.id}
 							onToggleDetails={() => toggleCardDetails(m.id)}
 							onDeleted={fetchMonitors}
+							groups={$groups}
+							onAssignGroup={assignGroup}
 							compact={viewMode === 'list'}
 						/>
 					{/each}
@@ -862,6 +891,8 @@
 											showDetails={openCardId === m.id}
 											onToggleDetails={() => toggleCardDetails(m.id)}
 											onDeleted={fetchMonitors}
+											groups={$groups}
+											onAssignGroup={assignGroup}
 											compact={viewMode === 'list'}
 										/>
 									{/each}
@@ -1093,17 +1124,44 @@
 			</div>
 			<div class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
 				{#each $groups as g (g.id)}
-					<div class="flex items-center gap-2">
-						<input
-							class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							value={g.name}
-							on:change={(e) => renameGroup(g.id, e.currentTarget.value)}
-						/>
-						<button
-							type="button"
-							class="btn btn-sm btn-secondary"
-							on:click={() => deleteGroup(g.id)}>Suppr.</button
+					<div
+						class="flex flex-col gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 p-2"
+					>
+						<div class="flex items-center gap-2">
+							<input
+								class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								value={g.name}
+								on:change={(e) => renameGroup(g.id, e.currentTarget.value)}
+							/>
+							<button
+								type="button"
+								class="btn btn-sm btn-secondary"
+								on:click={() => deleteGroup(g.id)}>Suppr.</button
+							>
+						</div>
+						{#each $monitors.filter((m) => m.groupId === g.id) as mem (mem.id)}
+							<div class="flex items-center gap-2 pl-1 text-xs">
+								<span class="text-slate-600 dark:text-slate-300">{mem.name}</span>
+								<button
+									type="button"
+									class="ml-auto text-rose-400 hover:text-rose-300"
+									on:click={() => assignGroup(mem.id, null)}>retirer</button
+								>
+							</div>
+						{/each}
+						<select
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+							on:change={(e) => {
+								const v = e.currentTarget.value;
+								e.currentTarget.value = '';
+								if (v) assignGroup(Number(v), g.id);
+							}}
 						>
+							<option value="">+ Ajouter un moniteur…</option>
+							{#each $monitors.filter((m) => m.groupId !== g.id) as opt (opt.id)}
+								<option value={String(opt.id)}>{opt.name}</option>
+							{/each}
+						</select>
 					</div>
 				{/each}
 				{#if $groups.length === 0}

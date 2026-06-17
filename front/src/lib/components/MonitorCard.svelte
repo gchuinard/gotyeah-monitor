@@ -4,6 +4,10 @@
 	import type { CheckEntry } from '$lib/stores/monitors';
 
 	export let id: number;
+	export let groupId: number | null = null;
+	export let groups: { id: number; name: string }[] = [];
+	export let onAssignGroup: ((monitorId: number, groupId: number | null) => void) | undefined =
+		undefined;
 	export let name: string;
 	export let url: string;
 	export let status: 'up' | 'down' | 'checking';
@@ -190,5 +194,17 @@
 		</div>
 	{/if}
 
+	{#if groups.length > 0 && onAssignGroup}
+		<select
+			class="self-start text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+			value={groupId == null ? '' : String(groupId)}
+			on:click|stopPropagation
+			on:change={(e) =>
+				onAssignGroup(id, e.currentTarget.value === '' ? null : Number(e.currentTarget.value))}
+		>
+			<option value="">Sans groupe</option>
+			{#each groups as g (g.id)}<option value={String(g.id)}>{g.name}</option>{/each}
+		</select>
+	{/if}
 	<StatusBar {history} monitorId={id} />
 </div>
