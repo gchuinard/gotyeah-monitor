@@ -806,7 +806,7 @@
 				</button>
 			</div>
 		{:else}
-			<div class="flex items-center gap-2 px-8 pt-6">
+			<div class="relative z-10 flex items-center gap-2 px-8 pt-6 pb-1">
 				<input
 					type="search"
 					bind:value={search}
@@ -896,7 +896,7 @@
 		<div
 			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-5"
+                   shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -1078,7 +1078,7 @@
 		use:modal={() => (showGroups = false)}
 	>
 		<div
-			class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-4"
+			class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"

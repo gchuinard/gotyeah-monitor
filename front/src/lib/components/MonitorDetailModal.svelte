@@ -307,7 +307,7 @@
 >
 	<div
 		class="w-full max-w-lg rounded-3xl bg-slate-950 border border-slate-800
-			   shadow-[0_0_80px_rgba(56,189,248,0.5)] flex flex-col gap-4 overflow-hidden"
+			   shadow-[0_0_80px_rgba(56,189,248,0.5)] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
 		on:click|stopPropagation
 		role="dialog"
 		aria-modal="true"
