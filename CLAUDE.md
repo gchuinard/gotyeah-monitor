@@ -80,6 +80,8 @@ Other auth facts to keep in mind:
 - **`SECRET_KEY` fails fast**: missing/<32 chars raises at import in prod (allowed only when `DEBUG=true`). Don't reintroduce a hardcoded fallback.
 - **Token versioning**: the JWT carries `tv` = `User.token_version`; `get_current_user` rejects if they differ. `token_version` is bumped on password reset and confirmed email change → invalidates old sessions. So any deploy that changes it logs everyone out.
 - **Email/reset/email-change tokens are hashed at rest** (`_hash_token` = SHA-256): the raw token is only emailed; lookups hash the incoming token. A DB dump can't be used to take over accounts.
+- **Action tokens travel in the URL fragment, not the query string**: email links are `…/verify-email#token=…` (`mail_service.py`). The fragment is never sent to a server (not in Referer, proxy logs, or access logs). The frontend reads it client-side via `getUrlToken()` (`front/src/lib/utils/token.ts`, with a `?token=` fallback for already-sent emails). Correspondingly, `verify-email` / `confirm-email-change` / `cancel-email-change` are **POST** (token in body via `schemas.TokenRequest`), not GET — so the token never lands in API logs either. `reset-password` was already POST.
+- **`/forgot-password` and `/change-email` send their emails via `BackgroundTasks`** so response time doesn't depend on whether the account exists (anti-enumeration timing). `/change-email` returns the same generic message whether the target address is free or taken (a notice goes to the real owner instead of a `400`).
 - **Register is anti-enumeration**: always returns the same generic message (resends verification if unverified, sends a notice if verified) — don't reintroduce a distinct "email already registered" 400.
 
 ### Admin is env-based, not a DB column
@@ -104,20 +106,21 @@ Migrations to date: `0001-0004` (initial + email flows), `0005` (`users.token_ve
 
 - `front/src/app.html` carries an inline `<script>` that applies the stored theme (`localStorage.theme` → `.dark` on `<html>`) **and** a brand background colour **before first paint**, so the brief JS-boot window isn't a white/wrong-theme flash.
 - The two redirect routes guard their render so they never paint before navigating: `/login` (`redirecting` flag) and `/` (`class:hidden={!authState?.token}`, with `onMount` redirecting to `/login`). The always-rendered gradient in `+layout.svelte` is what shows during the redirect.
-- Prod serves this fine via `vite preview` (no prerender/adapter-static needed); the server returns the empty shell and the client renders.
+- Prod serves the static build via **nginx** (`@sveltejs/adapter-static`, SPA fallback `index.html`); nginx returns the empty shell and the client renders. The fallback is what makes dynamic routes like `/edit/[id]` work — any unknown path falls back to `index.html` (`nginx.conf` `try_files ... /index.html`).
 
 ### StatusBar history window is per-monitor, persisted, bucketed
 
 `front/src/lib/components/StatusBar.svelte` is used in both `MonitorCard` and `MonitorDetailModal` — both must pass `monitorId={...}`. Per-monitor choice is stored in `localStorage.historyWindowHours` as a JSON map `{monitorId: hours}` (see `front/src/lib/stores/historyWindow.ts`). Each preset has a `bucketMinutes` field so bars aggregate adaptively (10 min for ≤12h windows, up to 1 day for 7j). A bucket with both up & down checks renders yellow, no-data buckets render gray.
 
-### Prod front isn't a real prod server
+### Prod front is static files served by nginx
 
-`front/Dockerfile.prod` runs `npm run preview` (Vite's preview server) on port 80. Fine for a Raspberry Pi side project, would NOT scale. If touching prod hosting, this is the thing to replace first (build a static adapter + serve via nginx, or use `@sveltejs/adapter-node`).
+`front/Dockerfile.prod` is **multi-stage**: a `node:24-alpine` builder runs `npm run build` (→ `@sveltejs/adapter-static` emits `build/`), then a `nginx:1.27-alpine` runtime stage serves `build/` on port 80 via `front/nginx.conf`. The Vite/esbuild/kit toolchain stays in the builder stage and is **never** in the runtime image — so its npm advisories aren't network-exposed in prod. nginx config does SPA routing (`try_files $uri $uri/ /index.html`), long-cache for `/_app/immutable/`, and sets security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`). `VITE_API_URL` is still a build `arg` (inlined at build, as before). (History: this used to run `npm run preview` — Vite's preview server — which exposed the dev toolchain in prod; replaced for that reason.)
 
 ## Deploy & CI
 
 - CI/CD lives in `.github/workflows/ci-cd.yml` (single file). Three jobs: `backend`, `frontend`, `deploy` (deploy only on push to `main`).
 - Deploy uses `appleboy/ssh-action` → SSH to Pi via `secrets.SSH_HOST/SSH_USER/SSH_KEY`. **`SSH_HOST` is the Pi's public IP — no DDNS configured**, so home IP changes break deploy with `dial tcp ***:22: i/o timeout`. Past fix: update the GH secret manually.
+- The deploy script is **health-gated with auto-rollback**: it records the current commit, `git pull`s, `up -d --build`, then waits for `monitor_api_prod` **and** `monitor_front_prod` to report Docker `healthy`. If either doesn't within the timeout, it `git reset --hard`s to the previous commit, rebuilds, and exits non-zero. So a build/migration that fails health checks reverts the code automatically (DB migrations are **not** rolled back — that's still a known gap).
 - `docker-compose.prod.yml` uses `monitor_net` as an `external: true` network. The reverse proxy (managed outside this repo) lives on that network. Creating the network is a one-time `docker network create monitor_net`.
 - API prod runs Python 3.11 (`Dockerfile.prod`), dev runs 3.14 (`Dockerfile`). Difference is mostly for asyncmy compile compatibility on ARM64 — don't try to align them without testing.
 
