@@ -72,10 +72,14 @@ jobs:
 
             git pull --ff-only
 
-            COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
+            # Fonction (et non variable) : le shell par défaut du Pi est zsh, qui ne
+            # découpe pas une variable non quotée en mots ($CMD up -> "CMD complet" up).
+            compose() {
+              docker compose -f docker-compose.prod.yml --env-file .env "$@"
+            }
 
             deploy() {
-              $COMPOSE up -d --build --force-recreate
+              compose up -d --build --force-recreate
             }
 
             # Attend qu'un conteneur passe 'healthy' (s'appuie sur les healthchecks compose)
@@ -93,7 +97,7 @@ jobs:
             rollback() {
               echo "::error::Déploiement KO → rollback vers $PREV_SHA"
               git reset --hard "$PREV_SHA"
-              $COMPOSE up -d --build --force-recreate
+              compose up -d --build --force-recreate
               exit 1
             }
 
