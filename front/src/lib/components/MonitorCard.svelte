@@ -21,6 +21,12 @@
 	export let onToggleDetails: () => void = () => {};
 	export let showDetails = false;
 	export let compact = false;
+	// M1 : champs de config étendus (passés via {...m}, affichage optionnel)
+	export let checkIntervalSeconds: number | null = null;
+	export let keyword: string | null = null;
+	export let keywordMode: 'present' | 'absent' | null = null;
+	export let latencyThresholdMs: number | null = null;
+	export let port: number | null = null;
 
 	let prevStatus: typeof status;
 	let animationClass = '';

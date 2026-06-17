@@ -55,6 +55,11 @@
 	let editUrl = '';
 	let editType = 'http';
 	let editExpectedCode = 200;
+	let editCheckIntervalSeconds: number | null = null;
+	let editKeyword = '';
+	let editKeywordMode: 'present' | 'absent' = 'present';
+	let editLatencyThresholdMs: number | null = null;
+	let editPort: number | null = null;
 	let submitting = false;
 	let editError: string | null = null;
 
@@ -63,6 +68,11 @@
 		editUrl = monitor.url;
 		editType = monitor.type;
 		editExpectedCode = monitor.expectedStatusCode;
+		editCheckIntervalSeconds = monitor.checkIntervalSeconds;
+		editKeyword = monitor.keyword ?? '';
+		editKeywordMode = monitor.keywordMode ?? 'present';
+		editLatencyThresholdMs = monitor.latencyThresholdMs;
+		editPort = monitor.port;
 		editError = null;
 		editing = true;
 	}
@@ -78,7 +88,12 @@
 					name: editName,
 					url: editUrl,
 					type: editType,
-					expected_status_code: editExpectedCode
+					expected_status_code: editExpectedCode,
+					check_interval_seconds: editCheckIntervalSeconds || null,
+					keyword: editType === 'http' && editKeyword.trim() ? editKeyword.trim() : null,
+					keyword_mode: editKeywordMode,
+					latency_threshold_ms: editLatencyThresholdMs || null,
+					port: editType === 'port' ? editPort : null
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -238,6 +253,68 @@
 						/>
 					</label>
 				</div>
+
+				<div class="grid grid-cols-2 gap-3">
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Intervalle (s)</span>
+						<input
+							type="number"
+							min="60"
+							max="86400"
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+							bind:value={editCheckIntervalSeconds}
+							placeholder="600 (défaut)"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Seuil latence (ms)</span>
+						<input
+							type="number"
+							min="1"
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+							bind:value={editLatencyThresholdMs}
+							placeholder="désactivé"
+						/>
+					</label>
+				</div>
+
+				{#if editType === 'http'}
+					<div class="grid grid-cols-2 gap-3">
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-400 uppercase tracking-wide">Mot-clé</span>
+							<input
+								class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+								bind:value={editKeyword}
+								placeholder="texte attendu (optionnel)"
+							/>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-400 uppercase tracking-wide">Mode</span>
+							<select
+								class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+								bind:value={editKeywordMode}
+							>
+								<option value="present">doit être présent</option>
+								<option value="absent">doit être absent</option>
+							</select>
+						</label>
+					</div>
+				{/if}
+
+				{#if editType === 'port'}
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Port</span>
+						<input
+							type="number"
+							min="1"
+							max="65535"
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+							bind:value={editPort}
+							placeholder="ex: 5432"
+							required
+						/>
+					</label>
+				{/if}
 
 				{#if editError}
 					<p

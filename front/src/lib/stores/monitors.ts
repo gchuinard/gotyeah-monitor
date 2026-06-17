@@ -23,6 +23,11 @@ export type MonitorCardData = {
 	sslExpiryAt: string | null;
 	uptime24h: number | null;
 	uptime7d: number | null;
+	checkIntervalSeconds: number | null;
+	keyword: string | null;
+	keywordMode: 'present' | 'absent' | null;
+	latencyThresholdMs: number | null;
+	port: number | null;
 	createdAt: string;
 };
 

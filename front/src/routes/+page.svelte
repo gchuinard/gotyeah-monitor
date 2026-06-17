@@ -23,6 +23,11 @@
 		ssl_expiry_at: string | null;
 		uptime_24h: number | null;
 		uptime_7d: number | null;
+		check_interval_seconds: number | null;
+		keyword: string | null;
+		keyword_mode: 'present' | 'absent' | null;
+		latency_threshold_ms: number | null;
+		port: number | null;
 		created_at: string;
 	};
 
@@ -43,6 +48,11 @@
 	let addUrl = '';
 	let addType = 'http';
 	let addExpectedStatusCode = 200;
+	let addCheckIntervalSeconds: number | null = null;
+	let addKeyword = '';
+	let addKeywordMode: 'present' | 'absent' = 'present';
+	let addLatencyThresholdMs: number | null = null;
+	let addPort: number | null = null;
 	let addSubmitting = false;
 	let addError: string | null = null;
 
@@ -51,6 +61,11 @@
 		addUrl = '';
 		addType = 'http';
 		addExpectedStatusCode = 200;
+		addCheckIntervalSeconds = null;
+		addKeyword = '';
+		addKeywordMode = 'present';
+		addLatencyThresholdMs = null;
+		addPort = null;
 		addError = null;
 		showAdd = true;
 	}
@@ -66,7 +81,12 @@
 					name: addName,
 					url: addUrl,
 					type: addType,
-					expected_status_code: addExpectedStatusCode
+					expected_status_code: addExpectedStatusCode,
+					check_interval_seconds: addCheckIntervalSeconds || null,
+					keyword: addType === 'http' && addKeyword.trim() ? addKeyword.trim() : null,
+					keyword_mode: addKeywordMode,
+					latency_threshold_ms: addLatencyThresholdMs || null,
+					port: addType === 'port' ? addPort : null
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -296,6 +316,11 @@
 					sslExpiryAt: m.ssl_expiry_at,
 					uptime24h: m.uptime_24h,
 					uptime7d: m.uptime_7d,
+					checkIntervalSeconds: m.check_interval_seconds,
+					keyword: m.keyword,
+					keywordMode: m.keyword_mode ?? 'present',
+					latencyThresholdMs: m.latency_threshold_ms,
+					port: m.port,
 					createdAt: m.created_at
 				}))
 			);
@@ -695,6 +720,68 @@
 						/>
 					</label>
 				</div>
+
+				<div class="grid grid-cols-2 gap-3">
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Intervalle (s)</span>
+						<input
+							type="number"
+							min="60"
+							max="86400"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={addCheckIntervalSeconds}
+							placeholder="600 (défaut)"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Seuil latence (ms)</span>
+						<input
+							type="number"
+							min="1"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={addLatencyThresholdMs}
+							placeholder="désactivé"
+						/>
+					</label>
+				</div>
+
+				{#if addType === 'http'}
+					<div class="grid grid-cols-2 gap-3">
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-500 dark:text-slate-400">Mot-clé</span>
+							<input
+								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								bind:value={addKeyword}
+								placeholder="texte attendu (optionnel)"
+							/>
+						</label>
+						<label class="flex flex-col gap-1">
+							<span class="text-xs text-slate-500 dark:text-slate-400">Mode</span>
+							<select
+								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								bind:value={addKeywordMode}
+							>
+								<option value="present">doit être présent</option>
+								<option value="absent">doit être absent</option>
+							</select>
+						</label>
+					</div>
+				{/if}
+
+				{#if addType === 'port'}
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Port</span>
+						<input
+							type="number"
+							min="1"
+							max="65535"
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={addPort}
+							placeholder="ex: 5432"
+							required
+						/>
+					</label>
+				{/if}
 
 				{#if addError}
 					<p
