@@ -79,6 +79,7 @@
 	let editLatencyThresholdMs: number | null = null;
 	let editPort: number | null = null;
 	let editGroupId: number | null = null;
+	let editIsPublic = false;
 	let submitting = false;
 	let editError: string | null = null;
 
@@ -93,6 +94,7 @@
 		editLatencyThresholdMs = monitor.latencyThresholdMs;
 		editPort = monitor.port;
 		editGroupId = monitor.groupId;
+		editIsPublic = monitor.isPublic;
 		editError = null;
 		editing = true;
 	}
@@ -114,7 +116,8 @@
 					keyword_mode: editKeywordMode,
 					latency_threshold_ms: editLatencyThresholdMs || null,
 					port: editType === 'port' ? editPort : null,
-					group_id: editGroupId == null ? null : Number(editGroupId)
+					group_id: editGroupId == null ? null : Number(editGroupId),
+					is_public: editIsPublic
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -299,6 +302,10 @@
 					</label>
 				</div>
 
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input type="checkbox" class="h-4 w-4 accent-cyan-500" bind:checked={editIsPublic} />
+					<span class="text-xs text-slate-400">Afficher sur la page de statut publique</span>
+				</label>
 				{#if $groups.length > 0}
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-400 uppercase tracking-wide">Groupe</span>

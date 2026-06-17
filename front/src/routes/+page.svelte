@@ -33,6 +33,7 @@
 		latency_threshold_ms: number | null;
 		port: number | null;
 		group_id: number | null;
+		is_public: boolean;
 		created_at: string;
 	};
 
@@ -59,6 +60,7 @@
 	let addLatencyThresholdMs: number | null = null;
 	let addPort: number | null = null;
 	let addGroupId: number | null = null;
+	let addIsPublic = false;
 	let addSubmitting = false;
 	let addError: string | null = null;
 
@@ -73,6 +75,7 @@
 		addLatencyThresholdMs = null;
 		addPort = null;
 		addGroupId = null;
+		addIsPublic = false;
 		addError = null;
 		showAdd = true;
 	}
@@ -94,7 +97,8 @@
 					keyword_mode: addKeywordMode,
 					latency_threshold_ms: addLatencyThresholdMs || null,
 					port: addType === 'port' ? addPort : null,
-					group_id: addGroupId == null ? null : Number(addGroupId)
+					group_id: addGroupId == null ? null : Number(addGroupId),
+					is_public: addIsPublic
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -216,6 +220,11 @@
 	let profileWebhookSubmitting = false;
 	let profileWebhookError: string | null = null;
 	let profileWebhookSuccess: string | null = null;
+	let profileStatusPageSlug = '';
+	let profileStatusPageTitle = '';
+	let profileStatusPageSubmitting = false;
+	let profileStatusPageError: string | null = null;
+	let profileStatusPageSuccess: string | null = null;
 
 	async function openProfile() {
 		profileNewEmail = '';
@@ -233,6 +242,9 @@
 		profileConfirmDelete = false;
 		profileDeleteConfirmText = '';
 		showProfile = true;
+		profileStatusPageError = null;
+		profileStatusPageSuccess = null;
+		void loadStatusPage();
 
 		// Pré-remplit la config notifications actuelle (best-effort).
 		try {
@@ -245,6 +257,43 @@
 			}
 		} catch {
 			/* best-effort */
+		}
+	}
+
+	async function loadStatusPage() {
+		try {
+			const res = await apiFetch('/status-page');
+			if (res.ok) {
+				const sp = await res.json();
+				if (sp) {
+					profileStatusPageSlug = sp.slug ?? '';
+					profileStatusPageTitle = sp.title ?? '';
+				}
+			}
+		} catch {
+			/* best-effort */
+		}
+	}
+
+	async function saveStatusPage() {
+		profileStatusPageSubmitting = true;
+		profileStatusPageError = null;
+		profileStatusPageSuccess = null;
+		try {
+			const res = await apiFetch('/status-page', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ slug: profileStatusPageSlug, title: profileStatusPageTitle })
+			});
+			if (!res.ok) {
+				profileStatusPageError = await parseApiError(res, 'page publique');
+			} else {
+				profileStatusPageSuccess = 'Page publique enregistrée.';
+			}
+		} catch (e) {
+			profileStatusPageError = parseNetworkError(e, 'page publique');
+		} finally {
+			profileStatusPageSubmitting = false;
 		}
 	}
 
@@ -403,6 +452,7 @@
 					latencyThresholdMs: m.latency_threshold_ms,
 					port: m.port,
 					groupId: m.group_id,
+					isPublic: m.is_public,
 					createdAt: m.created_at
 				}))
 			);
@@ -878,6 +928,12 @@
 					</label>
 				</div>
 
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input type="checkbox" class="h-4 w-4 accent-cyan-500" bind:checked={addIsPublic} />
+					<span class="text-xs text-slate-600 dark:text-slate-300"
+						>Afficher sur la page de statut publique</span
+					>
+				</label>
 				{#if $groups.length > 0}
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Groupe</span>
@@ -1211,6 +1267,65 @@
 						>
 							{profileWebhookSubmitting ? 'Enregistrement...' : 'Enregistrer'}
 						</button>
+					</div>
+				</form>
+
+				<!-- Page publique -->
+				<form
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+					on:submit|preventDefault={saveStatusPage}
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+					>
+						Page publique
+					</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+						Publie une page de statut accessible sans connexion, listant les moniteurs marqués «
+						publics ».
+					</p>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Identifiant d'URL (slug)</span>
+						<input
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileStatusPageSlug}
+							placeholder="mon-statut"
+						/>
+					</label>
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Titre</span>
+						<input
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileStatusPageTitle}
+							placeholder="Statut de mes services"
+						/>
+					</label>
+					{#if profileStatusPageSlug}
+						<a
+							href={`/status/${profileStatusPageSlug}`}
+							target="_blank"
+							rel="noreferrer"
+							class="text-xs text-cyan-600 hover:underline"
+							>Voir la page → /status/{profileStatusPageSlug}</a
+						>
+					{/if}
+					{#if profileStatusPageError}<div
+							class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
+						>
+							{profileStatusPageError}
+						</div>{/if}
+					{#if profileStatusPageSuccess}<div
+							class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
+						>
+							{profileStatusPageSuccess}
+						</div>{/if}
+					<div class="flex justify-end pt-1">
+						<button
+							type="submit"
+							class="btn btn-sm btn-primary disabled:opacity-50"
+							disabled={profileStatusPageSubmitting}
+							>{profileStatusPageSubmitting ? 'Enregistrement...' : 'Enregistrer'}</button
+						>
 					</div>
 				</form>
 
