@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, beforeUpdate } from 'svelte';
+	import { onMount } from 'svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import type { CheckEntry } from '$lib/stores/monitors';
 
@@ -28,13 +28,16 @@
 
 	onMount(() => setTimeout(() => (mounted = true), 20));
 
-	beforeUpdate(() => {
-		if (prevStatus && status !== prevStatus) {
-			animationClass = status === 'up' ? 'animate-flashGreen' : 'animate-flashRed';
+	// Flash au changement de statut. Réactif sur `status` (l'assignation de prevStatus
+	// dans la fonction appelée n'est pas tracée → pas de boucle), remplace beforeUpdate.
+	$: flashOnStatusChange(status);
+	function flashOnStatusChange(s: typeof status) {
+		if (prevStatus !== undefined && s !== prevStatus) {
+			animationClass = s === 'up' ? 'animate-flashGreen' : 'animate-flashRed';
 			setTimeout(() => (animationClass = ''), 600);
 		}
-		prevStatus = status;
-	});
+		prevStatus = s;
+	}
 
 	const statusColor = {
 		up: 'text-emerald-400',

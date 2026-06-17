@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { getUrlToken } from '$lib/utils/token';
 
 	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -8,7 +9,7 @@
 	let message = '';
 
 	onMount(async () => {
-		const token = new URLSearchParams(window.location.search).get('token');
+		const token = getUrlToken();
 		if (!token) {
 			pageStatus = 'error';
 			message = 'Lien invalide.';
@@ -16,7 +17,11 @@
 		}
 
 		try {
-			const res = await fetch(`${API_URL}/auth/verify-email?token=${token}`);
+			const res = await fetch(`${API_URL}/auth/verify-email`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ token })
+			});
 			const data = await res.json();
 			if (res.ok) {
 				pageStatus = 'success';

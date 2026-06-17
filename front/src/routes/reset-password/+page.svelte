@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
+	import { getUrlToken } from '$lib/utils/token';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 	import { onMount } from 'svelte';
 
@@ -19,7 +20,7 @@
 	$: canSubmit = passwordValid && newPassword === confirmPassword && confirmPassword !== '';
 
 	onMount(() => {
-		token = new URLSearchParams(window.location.search).get('token') ?? '';
+		token = getUrlToken();
 		if (!token) invalidLink = true;
 	});
 

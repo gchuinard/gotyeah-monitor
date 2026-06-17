@@ -3,6 +3,7 @@
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import { apiFetch } from '$lib/utils/api';
+	import { modal } from '$lib/actions/modal';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
@@ -623,6 +624,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40"
 		on:click={() => (showAdd = false)}
 		role="presentation"
+		use:modal={() => (showAdd = false)}
 	>
 		<div
 			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
@@ -724,6 +726,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40 px-4"
 		on:click={() => (showProfile = false)}
 		role="presentation"
+		use:modal={() => (showProfile = false)}
 	>
 		<div
 			class="w-full max-w-lg rounded-2xl overflow-hidden

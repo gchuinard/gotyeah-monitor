@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
+	import { modal } from '$lib/actions/modal';
 
 	type Monitor = {
 		id: number;
@@ -404,6 +405,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
 		on:click={() => (editModal = null)}
 		role="presentation"
+		use:modal={() => (editModal = null)}
 	>
 		<div
 			class="w-full max-w-md mx-4 rounded-2xl bg-white dark:bg-slate-900
@@ -484,6 +486,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
 		on:click={() => (confirmModal = null)}
 		role="presentation"
+		use:modal={() => (confirmModal = null)}
 	>
 		<!-- Modal -->
 		<div

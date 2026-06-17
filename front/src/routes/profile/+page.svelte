@@ -3,9 +3,9 @@
 	import { onMount } from 'svelte';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { get } from 'svelte/store';
+	import { apiFetch } from '$lib/utils/api';
+	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
-
-	const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 	let state: AuthState = { token: null, user: null };
 	let email = '';
@@ -43,18 +43,16 @@
 				payload.password = newPassword;
 			}
 
-			const res = await fetch(`${API_URL}/auth/me`, {
+			// apiFetch ajoute le JWT et, sur 401, purge la session + redirige vers /login.
+			const res = await apiFetch('/auth/me', {
 				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${state.token}`
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)
 			});
 
 			if (!res.ok) {
-				const text = await res.text().catch(() => '');
-				throw new Error(text || `HTTP ${res.status}`);
+				error = await parseApiError(res, 'profil');
+				return;
 			}
 
 			const me = await res.json();
@@ -64,7 +62,7 @@
 			newPassword = '';
 			confirmPassword = '';
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Erreur inconnue';
+			error = parseNetworkError(e, 'profil');
 		} finally {
 			submitting = false;
 		}

@@ -2,6 +2,7 @@
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { apiFetch } from '$lib/utils/api';
+	import { modal } from '$lib/actions/modal';
 	import { onMount } from 'svelte';
 	import type { MonitorCardData } from '$lib/stores/monitors';
 
@@ -141,10 +142,6 @@
 
 	const statusIcon = { up: '🟢', down: '🔴', checking: '⏳' };
 
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onClose();
-	}
-
 	async function confirmDelete() {
 		if (deleting) return;
 		deleting = true;
@@ -162,13 +159,12 @@
 	}
 </script>
 
-<svelte:window on:keydown={onKeydown} />
-
 <div
 	class="fixed inset-0 z-[100] flex items-center justify-center p-4"
 	style="background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);"
 	on:click={onClose}
 	role="presentation"
+	use:modal={onClose}
 >
 	<div
 		class="w-full max-w-lg rounded-3xl bg-slate-950 border border-slate-800

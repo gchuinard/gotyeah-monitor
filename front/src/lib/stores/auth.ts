@@ -30,7 +30,13 @@ export const auth = writable<AuthState>(initial);
 
 auth.subscribe((value) => {
 	if (typeof localStorage === 'undefined') return;
-	localStorage.setItem('auth', JSON.stringify(value));
+	// Déconnecté (token null) : on retire carrément la clé plutôt que d'y laisser
+	// traîner {token:null,user:null}.
+	if (value.token === null) {
+		localStorage.removeItem('auth');
+	} else {
+		localStorage.setItem('auth', JSON.stringify(value));
+	}
 });
 
 export function setAuth(token: string, user: AuthUser) {
