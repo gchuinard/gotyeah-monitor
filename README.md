@@ -1,12 +1,12 @@
 # GotYeah Monitor
 
-Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URLs HTTP, vérifie les codes de statut, mesure la latence, suit l'expiration des certificats SSL, **alerte par email et webhook quand un service tombe**, calcule le **% d'uptime** et tient un **journal d'incidents**.
+Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des services en **HTTP, ping ou port (TCP)**, vérifie codes de statut et **contenu (mot-clé)**, mesure la latence, suit l'expiration SSL, **alerte par email et webhook** (panne, rétablissement, latence, SSL), calcule le **% d'uptime (24h → 90j) et un SLA mensuel**, tient un **journal d'incidents**, et publie une **page de statut publique** avec badge SVG.
 
 ## Stack technique
 
 | Couche | Techno |
 |---|---|
-| Backend | FastAPI (Python 3.14) + SQLAlchemy async + Alembic |
+| Backend | FastAPI (Python 3.11 prod / 3.14 dev) + SQLAlchemy async + Alembic |
 | Base de données | MySQL 8 |
 | Frontend | SvelteKit 2 + Tailwind CSS v4 + TypeScript |
 | Infra | Docker Compose (dev & prod) |
@@ -14,17 +14,26 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URL
 
 ## Fonctionnalités
 
-- Ajout de monitors HTTP avec code de statut attendu configurable
-- Vérification automatique toutes les **10 minutes** (checks réseau concurrents, bornés)
-- Suivi de la latence et de l'historique des checks (rétention **7 jours**)
-- Visualisation de l'historique avec **fenêtre temporelle configurable par monitor** (1h → 7j), persistée localement ; bucketing adaptatif des barres de statut (10 min sur les vues courtes, jusqu'à 1 jour sur 7j) avec couleur intermédiaire pour les périodes mixtes
-- **% d'uptime (24h / 7j)** affiché sur chaque carte
-- **Alerting** : email + webhook (Discord / Slack / ntfy) sur **panne** (après 2 échecs consécutifs — anti-flapping), **rétablissement**, et **expiration SSL** (J-30 / J-14 / J-7 / J-1 / expiré)
-- **Journal d'incidents** persisté (ouverture/fermeture automatiques, conservé bien au-delà des checks)
-- **Auto-surveillance** : endpoint `/health` reflétant la liveness réelle de la boucle, watchdog (relance la boucle si elle meurt) et dead-man switch sortant optionnel (`HEARTBEAT_URL`)
+### Surveillance
+- Monitors **HTTP, ping et port (TCP)** — code de statut attendu, **check de contenu (mot-clé présent/absent)**, **seuil de latence**, et **intervalle de check configurable par monitor** (la boucle réveille toutes les 60 s et ne sonde que les monitors « dus », par défaut toutes les 10 min ; checks réseau concurrents et bornés)
+- Suivi de la latence et de l'historique des checks (rétention **7 jours**), visualisé avec une **fenêtre temporelle configurable par monitor** (1h → 7j, persistée localement, bucketing adaptatif des barres de statut)
+- **% d'uptime 24h / 7j / 30j / 90j** sur chaque carte + **rapport SLA mensuel** (table de rollup quotidien)
 - Détection et affichage de l'**expiration SSL**
-- Authentification complète : inscription, vérification email, connexion JWT (rate-limitée, tokens hachés au repos)
-- Réinitialisation de mot de passe et changement d'email par token
+
+### Organisation & partage
+- **Groupes de monitors** : dashboard regroupé repliable + barre de recherche
+- **Page de statut publique** par utilisateur (`/status/<slug>`, accessible sans connexion) + **badge SVG d'uptime** embeddable — seuls les monitors marqués « publics » sont exposés (jamais l'URL ni de détail privé)
+- **Tokens d'API en lecture seule** (`Authorization: Bearer gym_…`) pour interroger l'API depuis Grafana / scripts sans le mot de passe
+
+### Alerting & incidents
+- **Alerting** email + webhook (Discord / Slack / ntfy / générique) sur **panne** (après 2 échecs consécutifs — anti-flapping), **rétablissement**, **latence élevée** (seuil par monitor), et **expiration SSL** (J-30 / J-14 / J-7 / J-1 / expiré)
+- **Journal d'incidents** persisté (ouverture/fermeture automatiques, conservé bien au-delà des checks), avec **acquittement + note de post-mortem**
+- **Fenêtres de maintenance** planifiées : muettent alertes et ouvertures d'incident pendant la fenêtre (les checks continuent)
+
+### Comptes & exploitation
+- Authentification complète : inscription, vérification email, connexion JWT (rate-limitée, tokens hachés au repos), réinitialisation de mot de passe, changement d'email
+- **Auto-surveillance** : endpoint `/health` reflétant la liveness réelle de la boucle, watchdog (relance la boucle si elle meurt) et dead-man switch sortant optionnel (`HEARTBEAT_URL`)
+- Garde **anti-SSRF** sur toutes les cibles sondées (checks HTTP/ping/port et webhooks)
 - Interface d'administration
 
 ## Structure du projet
@@ -33,21 +42,24 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des URL
 gotyeah-monitor/
 ├── api/                  # FastAPI — logique métier, checks, auth
 │   ├── routers/
-│   │   ├── monitors.py   # CRUD monitors + historique + % uptime + incidents
+│   │   ├── monitors.py   # CRUD monitors + uptime/SLA + incidents + maintenance
+│   │   ├── groups.py     # Groupes de monitors
+│   │   ├── public.py     # Page de statut publique (non auth) + gestion + badge SVG
+│   │   ├── api_tokens.py # Tokens d'API (lecture seule)
 │   │   └── admin.py      # Routes admin
 │   ├── auth.py           # JWT (PyJWT), inscription, vérification email, rate-limit
 │   ├── models.py         # Modèles SQLAlchemy
 │   ├── schemas.py        # Schémas Pydantic
 │   ├── database.py       # Session async MySQL
 │   ├── mail_service.py   # Envoi d'emails (SMTP) : auth + alertes
-│   ├── notifications.py  # Moteur d'alerting (transitions, SSL) + webhooks
+│   ├── notifications.py  # Moteur d'alerting (transitions, latence, SSL) + webhooks
 │   ├── ssrf_guard.py     # Garde anti-SSRF partagée (checks + webhooks)
 │   ├── rate_limit.py     # Limiteur de débit (slowapi)
 │   ├── main.py           # App FastAPI + boucle de monitoring + /health + watchdog
 │   └── alembic/          # Migrations DB
 ├── front/                # SvelteKit — interface utilisateur
 │   └── src/
-│       └── routes/       # Pages : dashboard, login, register, profil…
+│       └── routes/       # Pages : dashboard, login, register, profil, status/[slug] (publique)…
 ├── docker-compose.dev.yml
 └── docker-compose.prod.yml
 ```
@@ -150,7 +162,7 @@ Le pipeline GitHub Actions (`.github/workflows/`) effectue à chaque push :
 
 1. **Backend** — installation des dépendances Python + compilation (`compileall`)
 2. **Frontend** — `npm ci`, lint ESLint/Prettier, `vite build`
-3. **Deploy** (uniquement sur `main`) — connexion SSH au Pi, `git pull`, `docker compose up --build`
+3. **Deploy** (uniquement sur `main`) — SSH au Pi, `git pull`, `docker compose up --build`, **puis attente des healthchecks Docker avec rollback automatique** (retour au commit précédent) si l'API ou le front ne deviennent pas sains
 
 ## Développement frontend seul
 
