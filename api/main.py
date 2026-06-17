@@ -40,6 +40,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+# Origine du front autorisée par le CORS (sinon "*" si non configuré, ex. dev local).
+_FRONTEND_ORIGIN = os.getenv("FRONTEND_URL", "").rstrip("/")
 
 
 @app.exception_handler(Exception)
@@ -51,12 +53,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
     # Ce handler (Starlette ServerErrorMiddleware, niveau le plus externe) court-circuite
     # le CORSMiddleware : on remet donc l'en-tête CORS à la main, en cohérence avec la
-    # politique globale allow_origins=["*"] (credentials désactivés) — sinon le front,
+    # politique CORS (origine du front, credentials désactivés) — sinon le front,
     # servi sur un autre domaine, ne pourrait pas lire les réponses 500.
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc) if _DEBUG else "Internal server error"},
-        headers={"Access-Control-Allow-Origin": "*"},
+        headers={"Access-Control-Allow-Origin": _FRONTEND_ORIGIN or "*"},
     )
 
 
@@ -468,9 +470,11 @@ async def on_shutdown() -> None:
             pass
 
 
+# CORS restreint à l'origine du front (Bearer tokens, pas de cookies -> credentials off).
+# Fallback "*" si FRONTEND_URL non configuré (dev local sans .env).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[_FRONTEND_ORIGIN] if _FRONTEND_ORIGIN else ["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
