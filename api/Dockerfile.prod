@@ -1,17 +1,36 @@
-FROM python:3.11-slim
-
-WORKDIR /app
+# --- Étape build : compile les dépendances (asyncmy = Cython) avec build-essential.
+#     Ces outils restent dans le builder et ne sont PAS dans l'image finale. ---
+FROM python:3.11-slim AS builder
 
 # Outils de build pour compiler asyncmy (Cython) sur ARM64 / Raspberry Pi
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Venv isolé : on le copie tel quel dans l'image runtime (mêmes base/arch → .so compatibles)
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# --- Étape runtime : pas de build-essential, utilisateur non privilégié ---
+FROM python:3.11-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Dépendances compilées importées depuis le builder
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+COPY . .
 RUN chmod +x entrypoint.sh
+
+# Utilisateur non-root (l'API écoute sur 8000 > 1024, aucune capacité root requise)
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 
 CMD ["./entrypoint.sh"]

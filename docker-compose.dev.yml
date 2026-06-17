@@ -34,6 +34,8 @@ services:
 
   db:
     image: mysql:8.4
+    # Charset/collation explicites (= défaut MySQL 8.4) : indépendant de l'image.
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
     container_name: monitor_db_dev
     restart: unless-stopped
     env_file:
@@ -51,7 +53,7 @@ services:
       retries: 10
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.30
     container_name: monitor_mailpit_dev
     ports:
       - "8025:8025"

@@ -63,6 +63,41 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
+            set -e
             cd /home/pi/sites/gotyeah-monitor
-            git pull
-            docker compose -f docker-compose.prod.yml --env-file .env up -d --build --force-recreate
+
+            # Commit courant = cible de rollback si le déploiement échoue
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Commit actuel (cible de rollback) : $PREV_SHA"
+
+            git pull --ff-only
+
+            COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env"
+
+            deploy() {
+              $COMPOSE up -d --build --force-recreate
+            }
+
+            # Attend qu'un conteneur passe 'healthy' (s'appuie sur les healthchecks compose)
+            wait_healthy() {
+              name="$1"; timeout=150; elapsed=0
+              while true; do
+                status=$(docker inspect --format '{{.State.Health.Status}}' "$name" 2>/dev/null || echo absent)
+                [ "$status" = healthy ] && return 0
+                [ "$status" = absent ] && { echo "Conteneur $name introuvable"; return 1; }
+                [ "$elapsed" -ge "$timeout" ] && { echo "$name non healthy après ${timeout}s (état: $status)"; return 1; }
+                sleep 5; elapsed=$((elapsed + 5))
+              done
+            }
+
+            rollback() {
+              echo "::error::Déploiement KO → rollback vers $PREV_SHA"
+              git reset --hard "$PREV_SHA"
+              $COMPOSE up -d --build --force-recreate
+              exit 1
+            }
+
+            deploy || rollback
+            wait_healthy monitor_api_prod || rollback
+            wait_healthy monitor_front_prod || rollback
+            echo "Déploiement OK : api + front healthy"

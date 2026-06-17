@@ -5,6 +5,11 @@ services:
       dockerfile: Dockerfile.prod
     container_name: monitor_api_prod
     restart: unless-stopped
+    # Bornes au-dessus de l'usage normal : empêchent un emballement (fuite mémoire,
+    # boucle) de saturer le Pi et d'OOM-kill l'hôte. À ajuster selon la RAM du Pi.
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
     env_file:
       - .env
     environment:
@@ -32,6 +37,9 @@ services:
         VITE_API_URL: ${VITE_API_URL}
     container_name: monitor_front_prod
     restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 128
     networks:
       - monitor_net
     expose:
@@ -45,8 +53,13 @@ services:
 
   db:
     image: mysql:8.4
+    # Charset/collation explicites (= défaut MySQL 8.4) : indépendant de l'image.
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
     container_name: monitor_db_prod
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 512
     env_file:
       - .env
     environment:
