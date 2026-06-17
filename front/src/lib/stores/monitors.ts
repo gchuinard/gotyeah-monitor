@@ -32,6 +32,7 @@ export type MonitorCardData = {
 	port: number | null;
 	groupId: number | null;
 	isPublic: boolean;
+	inMaintenance: boolean;
 	createdAt: string;
 };
 

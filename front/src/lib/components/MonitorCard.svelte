@@ -29,6 +29,7 @@
 	export let keywordMode: 'present' | 'absent' | null = null;
 	export let latencyThresholdMs: number | null = null;
 	export let port: number | null = null;
+	export let inMaintenance = false;
 
 	let prevStatus: typeof status;
 	let animationClass = '';
@@ -112,6 +113,10 @@
 			<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 				<div class="flex items-center gap-2">
 					<h2 class="font-semibold text-sm text-slate-900 dark:text-slate-50 truncate">{name}</h2>
+					{#if inMaintenance}<span
+							class="px-1.5 py-0.5 text-[10px] rounded bg-orange-500/20 text-orange-300 border border-orange-500/30 shrink-0"
+							>🔧</span
+						>{/if}
 					<span
 						class="px-1.5 py-0.5 text-[10px] rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0"
 						>{type}</span
@@ -131,6 +136,10 @@
 			<div class="flex items-center gap-2">
 				<span class="text-xl">{statusIcon[status]}</span>
 				<h2 class="font-semibold text-lg text-slate-900 dark:text-slate-50">{name}</h2>
+				{#if inMaintenance}<span
+						class="px-2 py-0.5 text-[10px] rounded bg-orange-500/20 text-orange-300 border border-orange-500/30"
+						>🔧 maintenance</span
+					>{/if}
 			</div>
 			<span
 				class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"

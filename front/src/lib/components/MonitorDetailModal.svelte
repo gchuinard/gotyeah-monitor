@@ -2,6 +2,7 @@
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { apiFetch } from '$lib/utils/api';
+	import { parseApiError } from '$lib/utils/errors';
 	import { modal } from '$lib/actions/modal';
 	import { groups } from '$lib/stores/groups';
 	import { onMount } from 'svelte';
@@ -28,6 +29,14 @@
 	type SlaEntry = { month: string; uptime: number | null };
 	let slaMonths: SlaEntry[] = [];
 	let slaLoaded = false;
+	let maintenanceWindows: { id: number; start_at: string; end_at: string; label: string | null }[] =
+		[];
+	let maintenanceLoaded = false;
+	let mwStart = '';
+	let mwEnd = '';
+	let mwLabel = '';
+	let mwSubmitting = false;
+	let mwError: string | null = null;
 
 	async function loadIncidents() {
 		try {
@@ -51,9 +60,64 @@
 		}
 	}
 
+	async function loadMaintenance() {
+		try {
+			const res = await apiFetch(`/monitors/${monitor.id}/maintenance`);
+			if (res.ok) maintenanceWindows = await res.json();
+		} catch {
+			/* best-effort */
+		} finally {
+			maintenanceLoaded = true;
+		}
+	}
+
+	async function submitMaintenance() {
+		if (!mwStart || !mwEnd) return;
+		mwSubmitting = true;
+		mwError = null;
+		try {
+			const res = await apiFetch(`/monitors/${monitor.id}/maintenance`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					start_at: new Date(mwStart).toISOString(),
+					end_at: new Date(mwEnd).toISOString(),
+					label: mwLabel.trim() || null
+				})
+			});
+			if (!res.ok) {
+				mwError = await parseApiError(res, 'maintenance');
+				return;
+			}
+			mwStart = '';
+			mwEnd = '';
+			mwLabel = '';
+			await loadMaintenance();
+		} catch (e) {
+			mwError = e instanceof Error ? e.message : 'Erreur inconnue';
+		} finally {
+			mwSubmitting = false;
+		}
+	}
+
+	async function deleteMaintenance(id: number) {
+		mwError = null;
+		try {
+			const res = await apiFetch(`/monitors/${monitor.id}/maintenance/${id}`, { method: 'DELETE' });
+			if (!res.ok && res.status !== 204) {
+				mwError = await parseApiError(res, 'maintenance');
+				return;
+			}
+			await loadMaintenance();
+		} catch (e) {
+			mwError = e instanceof Error ? e.message : 'Erreur inconnue';
+		}
+	}
+
 	onMount(() => {
 		loadIncidents();
 		loadSla();
+		loadMaintenance();
 	});
 
 	function incidentDuration(inc: IncidentEntry): string {
@@ -684,6 +748,62 @@
 						{/each}
 					</div>
 				{/if}
+			</div>
+
+			<div class="px-6 flex flex-col gap-2">
+				<span class="text-[10px] text-slate-500 uppercase tracking-wide">Maintenance planifiée</span
+				>
+				{#if maintenanceLoaded && maintenanceWindows.length > 0}
+					<div class="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+						{#each maintenanceWindows as w (w.id)}
+							<div
+								class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+							>
+								<span class="text-slate-300">{w.label || 'Maintenance'}</span>
+								<span class="text-slate-500 font-mono text-[11px]"
+									>{new Date(w.start_at).toLocaleString('fr-FR')} → {new Date(
+										w.end_at
+									).toLocaleString('fr-FR')}</span
+								>
+								<button
+									type="button"
+									class="ml-auto text-rose-400 hover:text-rose-300"
+									on:click={() => deleteMaintenance(w.id)}>✕</button
+								>
+							</div>
+						{/each}
+					</div>
+				{/if}
+				<div class="grid grid-cols-2 gap-2">
+					<label class="flex flex-col gap-1"
+						><span class="text-[10px] text-slate-500">Début</span>
+						<input
+							type="datetime-local"
+							bind:value={mwStart}
+							class="px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+						/></label
+					>
+					<label class="flex flex-col gap-1"
+						><span class="text-[10px] text-slate-500">Fin</span>
+						<input
+							type="datetime-local"
+							bind:value={mwEnd}
+							class="px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+						/></label
+					>
+				</div>
+				<input
+					bind:value={mwLabel}
+					placeholder="Libellé (optionnel)"
+					class="px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+				/>
+				{#if mwError}<p class="text-[11px] text-rose-400">{mwError}</p>{/if}
+				<button
+					type="button"
+					class="btn btn-sm btn-secondary self-start"
+					on:click={submitMaintenance}
+					disabled={mwSubmitting || !mwStart || !mwEnd}>{mwSubmitting ? '...' : 'Planifier'}</button
+				>
 			</div>
 
 			<!-- Footer -->

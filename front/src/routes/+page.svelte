@@ -34,6 +34,7 @@
 		port: number | null;
 		group_id: number | null;
 		is_public: boolean;
+		in_maintenance: boolean;
 		created_at: string;
 	};
 
@@ -453,6 +454,7 @@
 					port: m.port,
 					groupId: m.group_id,
 					isPublic: m.is_public,
+					inMaintenance: m.in_maintenance,
 					createdAt: m.created_at
 				}))
 			);
