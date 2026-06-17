@@ -1,22 +1,32 @@
-FROM node:24-alpine
+# --- Étape build : compile le SPA. La toolchain Vite/esbuild/kit ne sort PAS
+#     de cette étape (elle n'est jamais embarquée dans l'image finale). ---
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
-# Installer les dépendances (npm ci = reproductible depuis le lockfile, comme la CI)
+# npm ci = reproductible depuis le lockfile, comme la CI
 COPY package*.json ./
 RUN npm ci
 
-# Copier le code
 COPY . .
 
-# VITE_* vars must be available at build time
+# VITE_* doit être disponible au build (valeur inlinée dans le bundle)
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build SvelteKit
 RUN npm run build
+
+# --- Étape runtime : nginx sert les fichiers statiques. Aucun Node ni Vite
+#     dans l'image → les advisories de la toolchain de dev ne sont plus exposées. ---
+FROM nginx:1.27-alpine
+
+# Config SPA (fallback index.html) + en-têtes de sécurité + cache des assets
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Fichiers statiques produits par adapter-static
+COPY --from=builder /app/build /usr/share/nginx/html
 
 EXPOSE 80
 
-# Lancer le serveur de prévisualisation en prod
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "80"]
+# L'image nginx fournit déjà le bon CMD (master root pour binder 80,
+# workers en utilisateur non privilégié `nginx`).
