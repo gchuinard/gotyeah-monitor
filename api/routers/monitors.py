@@ -77,6 +77,24 @@ async def _attach_uptime(db: AsyncSession, monitors: List[models.Monitor]) -> No
         m.uptime_90d = u90.get(m.id)
 
 
+async def _attach_maintenance(db: AsyncSession, monitors: List[models.Monitor]) -> None:
+    """Marque in_maintenance=True les monitors couverts par une fenêtre active maintenant."""
+    ids = [m.id for m in monitors]
+    if not ids:
+        return
+    now = datetime.now(timezone.utc)
+    res = await db.execute(
+        select(models.MaintenanceWindow.monitor_id).where(
+            models.MaintenanceWindow.monitor_id.in_(ids),
+            models.MaintenanceWindow.start_at <= now,
+            models.MaintenanceWindow.end_at >= now,
+        )
+    )
+    active = {row[0] for row in res.all()}
+    for m in monitors:
+        m.in_maintenance = m.id in active
+
+
 async def _validate_group(
     db: AsyncSession, group_id: Optional[int], user: models.User
 ) -> None:
@@ -100,6 +118,7 @@ async def list_monitors(
     )
     monitors = list(result.scalars().all())
     await _attach_uptime(db, monitors)
+    await _attach_maintenance(db, monitors)
     return monitors
 
 
@@ -144,6 +163,7 @@ async def get_monitor(
     if monitor.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     await _attach_uptime(db, [monitor])
+    await _attach_maintenance(db, [monitor])
     return monitor
 
 
@@ -276,3 +296,68 @@ async def get_monitor_sla(
         pct = round(100.0 * float(up or 0) / total, 2) if total else None
         out.append(schemas.SlaMonth(month=mo, uptime=pct))
     return out
+
+
+async def _owned_monitor(db: AsyncSession, monitor_id: int, current_user: models.User) -> models.Monitor:
+    monitor = await db.get(models.Monitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return monitor
+
+
+@router.get("/{monitor_id}/maintenance", response_model=List[schemas.MaintenanceWindowRead])
+async def list_maintenance(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> List[schemas.MaintenanceWindowRead]:
+    await _owned_monitor(db, monitor_id, current_user)
+    res = await db.execute(
+        select(models.MaintenanceWindow)
+        .where(models.MaintenanceWindow.monitor_id == monitor_id)
+        .order_by(models.MaintenanceWindow.start_at.desc())
+        .limit(50)
+    )
+    return list(res.scalars().all())
+
+
+@router.post(
+    "/{monitor_id}/maintenance",
+    response_model=schemas.MaintenanceWindowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_maintenance(
+    monitor_id: int,
+    payload: schemas.MaintenanceWindowCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> schemas.MaintenanceWindowRead:
+    await _owned_monitor(db, monitor_id, current_user)
+    window = models.MaintenanceWindow(
+        monitor_id=monitor_id,
+        start_at=payload.start_at,
+        end_at=payload.end_at,
+        label=payload.label,
+    )
+    db.add(window)
+    await db.commit()
+    await db.refresh(window)
+    return window
+
+
+@router.delete("/{monitor_id}/maintenance/{window_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_maintenance(
+    monitor_id: int,
+    window_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> None:
+    await _owned_monitor(db, monitor_id, current_user)
+    window = await db.get(models.MaintenanceWindow, window_id)
+    if not window or window.monitor_id != monitor_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    await db.delete(window)
+    await db.commit()
+    return None

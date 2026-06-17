@@ -64,7 +64,7 @@ class _Alert:
             m.latency_alert_sent = False
 
 
-def evaluate_alerts(monitors: List["models.Monitor"], now: datetime) -> List[_Alert]:
+def evaluate_alerts(monitors: List["models.Monitor"], now: datetime, in_maintenance: set) -> List[_Alert]:
     """Met à jour l'état d'alerting des monitors (in place) et renvoie les alertes à envoyer.
     À appeler APRÈS application des résultats de probe (monitor.status est le statut courant)."""
     alerts: List[_Alert] = []
@@ -76,6 +76,12 @@ def evaluate_alerts(monitors: List["models.Monitor"], now: datetime) -> List[_Al
             m.consecutive_failures += 1
         else:
             m.consecutive_failures = 0
+
+        # En maintenance : l'état (compteurs) est mis à jour mais AUCUNE alerte n'est
+        # générée (ni incident, cf _sync_incidents). À la fin de la fenêtre, si le
+        # monitor est toujours down, l'alerte partira (down_alert_sent reste False).
+        if m.id in in_maintenance:
+            continue
 
         # Pas de destinataire (monitor orphelin) -> rien à notifier
         if m.user is None:

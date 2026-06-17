@@ -102,6 +102,7 @@ class MonitorRead(MonitorBase):
     uptime_7d: Optional[float] = None
     uptime_30d: Optional[float] = None
     uptime_90d: Optional[float] = None
+    in_maintenance: bool = False
     created_at: datetime
 
     class Config:
@@ -152,6 +153,28 @@ class PublicMonitorStatus(BaseModel):
 class PublicStatusResponse(BaseModel):
     title: str
     monitors: List[PublicMonitorStatus] = []
+
+
+class MaintenanceWindowCreate(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    label: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def _check(self) -> "MaintenanceWindowCreate":
+        if self.end_at <= self.start_at:
+            raise ValueError("La fin doit être postérieure au début.")
+        return self
+
+
+class MaintenanceWindowRead(BaseModel):
+    id: int
+    start_at: datetime
+    end_at: datetime
+    label: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class UserWithMonitors(UserRead):

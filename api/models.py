@@ -85,6 +85,7 @@ class Monitor(Base):
     is_public = Column(Boolean, nullable=False, default=False, server_default="0")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
     incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
+    maintenance_windows = relationship("MaintenanceWindow", back_populates="monitor", cascade="all, delete-orphan")
 
     # Non mappés (pas des colonnes) : remplis à la lecture par le routeur via une
     # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
@@ -92,6 +93,8 @@ class Monitor(Base):
     uptime_7d = None
     uptime_30d = None
     uptime_90d = None
+    # Défaut False (pas None) : les routes qui ne le calculent pas sérialisent un bool valide.
+    in_maintenance = False
 
 
 class MonitorGroup(Base):
@@ -124,6 +127,25 @@ class StatusPage(Base):
     )
 
     user = relationship("User", back_populates="status_page")
+
+
+class MaintenanceWindow(Base):
+    # Fenêtre de maintenance planifiée : pendant [start_at, end_at], alertes et
+    # ouvertures d'incident sont muettes pour le monitor (les checks continuent).
+    __tablename__ = "maintenance_windows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    monitor_id = Column(
+        Integer, ForeignKey("monitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    end_at = Column(DateTime(timezone=True), nullable=False)
+    label = Column(String(255), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    monitor = relationship("Monitor", back_populates="maintenance_windows")
 
 
 class MonitorCheck(Base):

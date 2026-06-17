@@ -211,7 +211,7 @@ def apply_check_result(
 
 
 async def _sync_incidents(
-    session: AsyncSession, monitors: "list[models.Monitor]", now: datetime
+    session: AsyncSession, monitors: "list[models.Monitor]", now: datetime, in_maintenance: set
 ) -> None:
     """Ouvre un incident quand un monitor est confirmé down (même seuil que l'alerte),
     le ferme au rétablissement. Indépendant de l'envoi d'email, et non purgé par la
@@ -231,7 +231,9 @@ async def _sync_incidents(
             m.status == "down" and m.consecutive_failures >= ALERT_FAILURE_THRESHOLD
         )
         existing = open_by_monitor.get(m.id)
-        if confirmed_down and existing is None:
+        # En maintenance : on n'OUVRE pas de nouvel incident (downtime planifié), mais on
+        # ferme toujours un incident existant si le monitor remonte.
+        if confirmed_down and existing is None and m.id not in in_maintenance:
             session.add(
                 models.Incident(
                     monitor_id=m.id,
@@ -317,6 +319,17 @@ async def _run_rollup(now: datetime) -> None:
         logger.exception("Échec du rollup uptime quotidien")
 
 
+async def _active_maintenance(session: AsyncSession, now: datetime) -> set:
+    """IDs des monitors couverts par une fenêtre de maintenance active maintenant."""
+    res = await session.execute(
+        select(models.MaintenanceWindow.monitor_id).where(
+            models.MaintenanceWindow.start_at <= now,
+            models.MaintenanceWindow.end_at >= now,
+        )
+    )
+    return {row[0] for row in res.all()}
+
+
 async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     async with AsyncSessionLocal() as session:
         try:
@@ -347,8 +360,9 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
 
             # Alerting : UNIQUEMENT sur les monitors checkés ce tick — sinon on
             # déclencherait de fausses transitions/incidents sur des monitors non sondés.
-            alerts = evaluate_alerts(due, now)
-            await _sync_incidents(session, due, now)
+            maint = await _active_maintenance(session, now)
+            alerts = evaluate_alerts(due, now, maint)
+            await _sync_incidents(session, due, now, maint)
             await dispatch_alerts(client, alerts)
 
             await session.commit()
