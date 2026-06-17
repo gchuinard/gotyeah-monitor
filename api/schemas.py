@@ -59,6 +59,8 @@ class MonitorBase(BaseModel):
     latency_threshold_ms: Optional[int] = Field(default=None, ge=1, le=600000)
     # Cible TCP pour le type 'port'
     port: Optional[int] = Field(default=None, ge=1, le=65535)
+    # Groupe d'appartenance (None = sans groupe)
+    group_id: Optional[int] = None
 
 
 def _require_port_for_port_type(model: "MonitorBase") -> "MonitorBase":
@@ -96,6 +98,26 @@ class MonitorRead(MonitorBase):
     # Pourcentage de disponibilité (None si aucun check sur la fenêtre).
     uptime_24h: Optional[float] = None
     uptime_7d: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MonitorGroupBase(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+class MonitorGroupCreate(MonitorGroupBase):
+    pass
+
+
+class MonitorGroupUpdate(MonitorGroupBase):
+    pass
+
+
+class MonitorGroupRead(MonitorGroupBase):
+    id: int
     created_at: datetime
 
     class Config:

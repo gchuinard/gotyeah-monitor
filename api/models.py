@@ -31,6 +31,7 @@ class User(Base):
     )
 
     monitors = relationship("Monitor", back_populates="user")
+    monitor_groups = relationship("MonitorGroup", back_populates="user", cascade="all, delete-orphan")
     email_verifications = relationship("EmailVerification", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     email_change_requests = relationship("EmailChangeRequest", back_populates="user", cascade="all, delete-orphan")
@@ -75,6 +76,10 @@ class Monitor(Base):
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     user = relationship("User", back_populates="monitors")
+    # Groupe d'appartenance : SET NULL -> supprimer un groupe dégroupe ses monitors
+    # (ne les supprime pas).
+    group_id = Column(Integer, ForeignKey("monitor_groups.id", ondelete="SET NULL"), nullable=True, index=True)
+    group = relationship("MonitorGroup", back_populates="monitors")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
     incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
 
@@ -82,6 +87,21 @@ class Monitor(Base):
     # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
     uptime_24h = None
     uptime_7d = None
+
+
+class MonitorGroup(Base):
+    # 'groups' est un mot réservé MySQL 8 -> table préfixée 'monitor_groups'.
+    __tablename__ = "monitor_groups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship("User", back_populates="monitor_groups")
+    monitors = relationship("Monitor", back_populates="group")
 
 
 class MonitorCheck(Base):

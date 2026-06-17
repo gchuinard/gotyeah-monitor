@@ -71,6 +71,8 @@ Despite the empty `worker/` directory at the repo root, **there is no separate w
 
 Every router handler that touches a `Monitor` re-checks `monitor.user_id == current_user.id` and 403s otherwise. `Monitor.user_id` is nullable, and `update`/`delete` claim ownership of orphan monitors (`user_id is None`) for the current user — a legacy migration path. Don't drop that branch.
 
+**Groups** (`MonitorGroup`, table `monitor_groups` — `groups` is a reserved MySQL word) follow the same per-route ownership model: `routers/groups.py` CRUD is user-scoped, and `monitors.py` `_validate_group` rejects assigning a monitor to a group you don't own. `monitors.group_id` FK is **`ON DELETE SET NULL`** so deleting a group ungroups its monitors (doesn't delete them). The dashboard renders monitors grouped with per-group collapse (`groupCollapse` store, localStorage) + a client-side search filter; the "Sans groupe" section also catches monitors whose `groupId` matches no current group (so none ever vanish).
+
 ### Auth has a transparent SHA-256 → Argon2 rehash
 
 `api/auth.py` keeps a legacy code path: at login, if the stored hash is 64 hex chars (SHA-256), it's verified against SHA-256 and immediately rehashed to Argon2id via passlib. New registrations always use Argon2. Don't simplify the verify branch.
@@ -92,7 +94,7 @@ Other auth facts to keep in mind:
 
 `api/entrypoint.sh` checks if `users` table exists without an `alembic_version` row — if so, it `alembic stamp 0001` before running `upgrade head`. This protects pre-existing prod DBs that were created by `Base.metadata.create_all` before Alembic was introduced. Be careful when adding migration `0001`-equivalent destructive changes.
 
-Migrations to date: `0001-0004` (initial + email flows), `0005` (`users.token_version`), `0006` (composite index `monitor_checks(monitor_id, checked_at)`), `0007` (alerting state on `monitors` + webhook cols on `users`), `0008` (`incidents` table), `0009` (`users.alert_email_enabled`). New migrations follow the guarded idempotent style (`_column_exists`/`_table_exists`/`_index_exists`). **`create_all` is gated behind `DEBUG`** (`database.py:init_db`): prod schema is Alembic-only; dev uses `create_all`, so adding a column means recreating the dev volume (`docker compose -f docker-compose.dev.yml down -v`).
+Migrations to date: `0001-0004` (initial + email flows), `0005` (`users.token_version`), `0006` (composite index `monitor_checks(monitor_id, checked_at)`), `0007` (alerting state on `monitors` + webhook cols on `users`), `0008` (`incidents` table), `0009` (`users.alert_email_enabled`), `0010` (`monitors.user_id` FK → ON DELETE CASCADE), `0011` (per-monitor check config: interval/keyword/latency/port), `0012` (`monitor_groups` table + `monitors.group_id` FK SET NULL). New migrations follow the guarded idempotent style (`_column_exists`/`_table_exists`/`_index_exists`). **`create_all` is gated behind `DEBUG`** (`database.py:init_db`): prod schema is Alembic-only; dev uses `create_all`, so adding a column means recreating the dev volume (`docker compose -f docker-compose.dev.yml down -v`).
 
 ### Frontend talks to API via fetch + JWT in localStorage
 

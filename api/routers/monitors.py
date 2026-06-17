@@ -48,6 +48,19 @@ async def _attach_uptime(db: AsyncSession, monitors: List[models.Monitor]) -> No
         m.uptime_7d = u7.get(m.id)
 
 
+async def _validate_group(
+    db: AsyncSession, group_id: Optional[int], user: models.User
+) -> None:
+    """Si un group_id est fourni, vérifie qu'il existe et appartient à l'utilisateur."""
+    if group_id is None:
+        return
+    group = await db.get(models.MonitorGroup, group_id)
+    if not group:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Groupe introuvable")
+    if group.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Groupe non autorisé")
+
+
 @router.get("", response_model=List[schemas.MonitorRead])
 async def list_monitors(
     db: AsyncSession = Depends(get_db),
@@ -69,6 +82,7 @@ async def create_monitor(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.MonitorRead:
+    await _validate_group(db, payload.group_id, current_user)
     monitor = models.Monitor(
         name=payload.name,
         url=str(payload.url),
@@ -79,6 +93,7 @@ async def create_monitor(
         keyword_mode=payload.keyword_mode,
         latency_threshold_ms=payload.latency_threshold_ms,
         port=payload.port,
+        group_id=payload.group_id,
         user_id=current_user.id,
     )
     db.add(monitor)
@@ -120,6 +135,8 @@ async def update_monitor(
     elif monitor.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
+    await _validate_group(db, payload.group_id, current_user)
+
     monitor.name = payload.name
     monitor.url = str(payload.url)
     monitor.type = payload.type
@@ -129,6 +146,7 @@ async def update_monitor(
     monitor.keyword_mode = payload.keyword_mode
     monitor.latency_threshold_ms = payload.latency_threshold_ms
     monitor.port = payload.port
+    monitor.group_id = payload.group_id
 
     await db.commit()
     await db.refresh(monitor)
