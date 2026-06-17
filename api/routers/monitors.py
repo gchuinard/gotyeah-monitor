@@ -298,6 +298,28 @@ async def get_monitor_sla(
     return out
 
 
+@router.patch("/{monitor_id}/incidents/{incident_id}", response_model=schemas.IncidentRead)
+async def update_incident(
+    monitor_id: int,
+    incident_id: int,
+    payload: schemas.IncidentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> schemas.IncidentRead:
+    """Acquitte un incident et/ou enregistre un post-mortem."""
+    await _owned_monitor(db, monitor_id, current_user)
+    incident = await db.get(models.Incident, incident_id)
+    if not incident or incident.monitor_id != monitor_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if payload.acknowledged is not None:
+        incident.acknowledged_at = datetime.now(timezone.utc) if payload.acknowledged else None
+    if payload.postmortem is not None:
+        incident.postmortem = payload.postmortem.strip() or None
+    await db.commit()
+    await db.refresh(incident)
+    return incident
+
+
 async def _owned_monitor(db: AsyncSession, monitor_id: int, current_user: models.User) -> models.Monitor:
     monitor = await db.get(models.Monitor, monitor_id)
     if not monitor:

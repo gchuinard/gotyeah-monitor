@@ -196,9 +196,16 @@ class IncidentRead(BaseModel):
     started_at: datetime
     ended_at: Optional[datetime] = None  # None = incident en cours
     last_status_code: Optional[int] = None
+    acknowledged_at: Optional[datetime] = None
+    postmortem: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class IncidentUpdate(BaseModel):
+    acknowledged: Optional[bool] = None
+    postmortem: Optional[str] = Field(default=None, max_length=5000)
 
 
 class SlaMonth(BaseModel):

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Date, Boolean, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, Date, Boolean, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -178,6 +178,9 @@ class Incident(Base):
     started_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)  # NULL = incident en cours
     last_status_code = Column(Integer, nullable=True)
+    # M6 : workflow incident
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)  # NULL = non acquitté
+    postmortem = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     monitor = relationship("Monitor", back_populates="incidents")
