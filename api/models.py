@@ -11,6 +11,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
+    # Divergence volontaire de server_default : le modèle/create_all (dev) pose "0"
+    # (nouveaux comptes non vérifiés), alors que la migration 0003 (prod) a posé "1"
+    # pour grandfather les comptes pré-existants lors de l'ajout de la colonne. Sans
+    # impact : l'app fournit toujours is_verified explicitement à l'INSERT (register),
+    # le DEFAULT SQL n'est donc jamais sollicité.
     is_verified = Column(Boolean, nullable=False, default=False, server_default="0")
     # Incrémenté à chaque reset de mot de passe / changement d'email confirmé :
     # invalide les JWT émis avant (le token porte la version, vérifiée au login check).
@@ -61,7 +66,7 @@ class Monitor(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     user = relationship("User", back_populates="monitors")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
     incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
