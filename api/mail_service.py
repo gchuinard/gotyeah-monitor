@@ -416,3 +416,37 @@ async def send_ssl_expiry_email(to: str, name: str, days_left: int) -> None:
         content=content,
     )
     await _send(to, f"⏳ Certificat SSL de {name} – GotYeah Monitor", html)
+
+
+async def send_latency_alert_email(to: str, name: str, latency_ms: int, threshold_ms: int) -> None:
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Le monitor <strong style="color:#0f172a;">{name}</strong> répond, mais sa latence
+        dépasse le seuil configuré.
+      </p>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;">
+        <p style="margin:0;font-size:13px;color:#92400e;">Latence mesurée : <strong>{latency_ms} ms</strong> (seuil : {threshold_ms} ms)</p>
+      </div>
+    """
+    html = _base_template(
+        title="⚠️ Latence élevée",
+        preview=f"{name} dépasse le seuil de latence.",
+        content=content,
+    )
+    await _send(to, f"⚠️ {name} — latence élevée – GotYeah Monitor", html)
+
+
+async def send_latency_recovery_email(to: str, name: str, latency_ms: Optional[int]) -> None:
+    detail = f" ({latency_ms} ms)" if latency_ms is not None else ""
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        La latence de <strong style="color:#0f172a;">{name}</strong> est revenue sous le
+        seuil configuré{detail}. ⚡
+      </p>
+    """
+    html = _base_template(
+        title="⚡ Latence rétablie",
+        preview=f"{name} : latence de nouveau normale.",
+        content=content,
+    )
+    await _send(to, f"⚡ {name} — latence rétablie – GotYeah Monitor", html)

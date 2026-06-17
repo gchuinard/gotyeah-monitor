@@ -18,6 +18,8 @@ from mail_service import (
     send_monitor_down_email,
     send_monitor_up_email,
     send_ssl_expiry_email,
+    send_latency_alert_email,
+    send_latency_recovery_email,
 )
 
 logger = logging.getLogger("monitor")
@@ -43,7 +45,7 @@ class _Alert:
     def __init__(self, monitor: "models.Monitor", kind: str, **data):
         self.user = monitor.user
         self.monitor_name = monitor.name
-        self.kind = kind  # 'down' | 'up' | 'ssl'
+        self.kind = kind  # 'down' | 'up' | 'ssl' | 'latency' | 'latency_recovery'
         self.data = data
         self._monitor = monitor
 
@@ -56,6 +58,10 @@ class _Alert:
             m.down_since = None
         elif self.kind == "ssl":
             m.ssl_alert_level = self.data["level"]
+        elif self.kind == "latency":
+            m.latency_alert_sent = True
+        elif self.kind == "latency_recovery":
+            m.latency_alert_sent = False
 
 
 def evaluate_alerts(monitors: List["models.Monitor"], now: datetime) -> List[_Alert]:
@@ -88,6 +94,25 @@ def evaluate_alerts(monitors: List["models.Monitor"], now: datetime) -> List[_Al
         elif m.status == "up" and m.down_alert_sent:
             alerts.append(_Alert(m, "up", since=m.down_since, now=now))
 
+        # Latence : alerte si UP et au-dessus du seuil ; retour à la normale si on
+        # repasse dessous. Si le monitor n'est pas UP, on retire le drapeau en silence
+        # (l'alerte DOWN prend le relais). Pas de seuil de confirmation (latence ponctuelle).
+        over_threshold = (
+            m.status == "up"
+            and m.latency_threshold_ms is not None
+            and m.last_latency_ms is not None
+            and m.last_latency_ms > m.latency_threshold_ms
+        )
+        if over_threshold and not m.latency_alert_sent:
+            alerts.append(
+                _Alert(m, "latency", latency_ms=m.last_latency_ms, threshold_ms=m.latency_threshold_ms)
+            )
+        elif m.latency_alert_sent and not over_threshold:
+            if m.status == "up":
+                alerts.append(_Alert(m, "latency_recovery", latency_ms=m.last_latency_ms))
+            else:
+                m.latency_alert_sent = False
+
         # Expiration SSL
         expiry = m.ssl_expiry_at
         if expiry is not None:
@@ -113,6 +138,11 @@ def _alert_text(a: _Alert) -> str:
     if a.kind == "ssl":
         d = a.data["days_left"]
         return f"⏳ Certificat SSL de **{a.monitor_name}** : {'expiré' if d < 0 else f'expire dans {d} j'}."
+    if a.kind == "latency":
+        return f"⚠️ **{a.monitor_name}** : latence élevée ({a.data['latency_ms']} ms > seuil {a.data['threshold_ms']} ms)."
+    if a.kind == "latency_recovery":
+        lm = a.data.get("latency_ms")
+        return f"⚡ **{a.monitor_name}** : latence revenue à la normale" + (f" ({lm} ms)." if lm is not None else ".")
     return a.monitor_name
 
 
@@ -143,6 +173,10 @@ async def _send_one(client: httpx.AsyncClient, a: _Alert) -> None:
                 await send_monitor_up_email(user.email, a.monitor_name, a.data["since"], a.data["now"])
             elif a.kind == "ssl":
                 await send_ssl_expiry_email(user.email, a.monitor_name, a.data["days_left"])
+            elif a.kind == "latency":
+                await send_latency_alert_email(user.email, a.monitor_name, a.data["latency_ms"], a.data["threshold_ms"])
+            elif a.kind == "latency_recovery":
+                await send_latency_recovery_email(user.email, a.monitor_name, a.data.get("latency_ms"))
             email_ok = True
         except Exception:
             logger.exception("Échec envoi email d'alerte (%s / %s)", a.kind, a.monitor_name)

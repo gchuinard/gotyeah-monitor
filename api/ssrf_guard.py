@@ -33,6 +33,17 @@ def _host_resolves_to_blocked_ip(hostname: str, port: int) -> bool:
     return any(_ip_is_blocked(info[4][0]) for info in infos)
 
 
+async def host_is_safe(host: str, port: int) -> bool:
+    """Refuse un host:port résolvant vers le réseau interne. Résolution DNS faite au
+    moment de l'appel (anti-rebinding). Utilisé pour les checks TCP (ping/port)."""
+    if not host:
+        return False
+    loop = asyncio.get_event_loop()
+    return not await loop.run_in_executor(
+        None, _host_resolves_to_blocked_ip, host, port
+    )
+
+
 async def url_is_safe(url: str) -> bool:
     """Refuse une URL ciblant le réseau interne (loopback, RFC1918, link-local /
     métadonnées cloud, etc.). Résolution DNS faite au moment de l'appel (anti-rebinding)."""
@@ -43,7 +54,4 @@ async def url_is_safe(url: str) -> bool:
     if not hostname:
         return False
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    loop = asyncio.get_event_loop()
-    return not await loop.run_in_executor(
-        None, _host_resolves_to_blocked_ip, hostname, port
-    )
+    return await host_is_safe(hostname, port)

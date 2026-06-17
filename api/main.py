@@ -23,7 +23,7 @@ from slowapi.errors import RateLimitExceeded
 from database import AsyncSessionLocal, init_db
 import models
 from rate_limit import limiter
-from ssrf_guard import url_is_safe
+from ssrf_guard import url_is_safe, host_is_safe
 from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD
 from routers import monitors
 from routers import admin
@@ -57,7 +57,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-CHECK_INTERVAL_SECONDS = 600
+CHECK_INTERVAL_SECONDS = 600  # intervalle de check par défaut (par monitor, surchargeable)
+# La boucle se réveille à cette cadence et ne sonde que les monitors "dus" — permet des
+# intervalles par monitor plus courts que l'ancien cycle unique de 600s.
+TICK_INTERVAL_SECONDS = 60
+# Cadence (lente) du nettoyage de rétention et du heartbeat — pas à chaque tick.
+RETENTION_INTERVAL_SECONDS = 600
+# Taille max de corps lue pour le check par mot-clé (anti-OOM sur le Pi).
+MAX_BODY_BYTES = 256 * 1024
 HISTORY_RETENTION_DAYS = 7
 # Les incidents (clos) sont conservés bien plus longtemps que les checks (historique
 # long terme), mais bornés pour éviter une croissance illimitée de la table.
@@ -96,6 +103,22 @@ async def check_ssl_expiry(url: str) -> Optional[datetime]:
     return await loop.run_in_executor(None, _fetch_ssl_expiry, hostname, port)
 
 
+async def probe_port(host: str, port: int, timeout: float = 10.0) -> bool:
+    """Test de joignabilité par TCP connect (pas d'ICMP : l'API tourne en non-root)."""
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port), timeout=timeout
+        )
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
 async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> dict:
     """Effectue le check réseau SANS toucher la session (sûr à lancer en parallèle).
     Renvoie le résultat ; l'application en base se fait séquentiellement ensuite."""
@@ -105,14 +128,48 @@ async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> d
     new_status = "down"
     ssl_expiry: Optional[datetime] = None
 
+    # --- Types ping/port : simple TCP connect, gardé par le SSRF host-check ---
+    if monitor.type in ("ping", "port"):
+        parsed = urlparse(monitor.url)
+        host = parsed.hostname
+        if monitor.type == "port":
+            port = monitor.port or parsed.port
+        else:  # ping : joignabilité du host sur le port de l'URL (ou 443/80)
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        if host and port and await host_is_safe(host, port):
+            ok = await probe_port(host, port)
+            latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
+            new_status = "up" if ok else "down"
+        elif not (host and port):
+            logger.warning("Monitor %s ignoré : host/port manquant", monitor.id)
+        else:
+            logger.warning("Monitor %s ignoré : cible interne/non autorisée", monitor.id)
+        return {"status": new_status, "status_code": None, "latency_ms": latency_ms, "ssl_expiry": None}
+
+    # --- Type http : GET (+ check de contenu optionnel) ---
     if await url_is_safe(monitor.url):
+        need_body = bool(monitor.keyword)
         try:
-            # On ne lit PAS le corps (stream) : seul le code de statut compte, ce qui
-            # évite de charger en mémoire une réponse énorme (protection OOM sur le Pi).
+            # Sans mot-clé : on ne lit PAS le corps (stream) — seul le code compte,
+            # ce qui évite de charger une réponse énorme (anti-OOM). Avec mot-clé :
+            # lecture BORNÉE à MAX_BODY_BYTES.
             async with client.stream("GET", monitor.url, timeout=10.0) as response:
                 status_code = response.status_code
+                body_ok = True
+                if need_body:
+                    total = 0
+                    chunks: list[bytes] = []
+                    async for chunk in response.aiter_bytes():
+                        chunks.append(chunk)
+                        total += len(chunk)
+                        if total >= MAX_BODY_BYTES:
+                            break
+                    text = b"".join(chunks)[:MAX_BODY_BYTES].decode("utf-8", errors="ignore")
+                    found = monitor.keyword in text
+                    body_ok = found if monitor.keyword_mode == "present" else (not found)
             latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
-            new_status = "up" if status_code == monitor.expected_status_code else "down"
+            code_ok = status_code == monitor.expected_status_code
+            new_status = "up" if (code_ok and body_ok) else "down"
         except Exception:
             pass
         ssl_expiry = await check_ssl_expiry(monitor.url)
@@ -181,9 +238,20 @@ async def _sync_incidents(
             existing.ended_at = now
 
 
-async def _run_one_cycle(client: httpx.AsyncClient) -> None:
-    # Nettoyage de rétention dans SA PROPRE transaction : un échec des checks ne
-    # doit pas annuler le nettoyage, et inversement.
+def _is_due(monitor: models.Monitor, now: datetime) -> bool:
+    """True si le monitor doit être sondé maintenant (jamais checké, ou intervalle écoulé)."""
+    if monitor.last_checked_at is None:
+        return True
+    interval = monitor.check_interval_seconds or CHECK_INTERVAL_SECONDS
+    last = monitor.last_checked_at
+    if last.tzinfo is None:  # MySQL renvoie parfois un datetime naïf
+        last = last.replace(tzinfo=timezone.utc)
+    return (now - last).total_seconds() >= interval
+
+
+async def _run_retention() -> None:
+    # Nettoyage de rétention dans SA PROPRE transaction : un échec des checks ne doit
+    # pas annuler le nettoyage, et inversement.
     try:
         async with AsyncSessionLocal() as session:
             cutoff = datetime.now(timezone.utc) - timedelta(days=HISTORY_RETENTION_DAYS)
@@ -203,6 +271,8 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     except Exception:
         logger.exception("Échec du nettoyage de rétention")
 
+
+async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     async with AsyncSessionLocal() as session:
         try:
             # selectinload(user) : la boucle a besoin de l'email/webhook de l'owner pour alerter.
@@ -210,6 +280,12 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
                 select(models.Monitor).options(selectinload(models.Monitor.user))
             )
             all_monitors = list(result.scalars().all())
+
+            now = datetime.now(timezone.utc)
+            # Intervalle par monitor : on ne sonde que les monitors "dus" ce tick.
+            due = [m for m in all_monitors if _is_due(m, now)]
+            if not due:
+                return
 
             # Checks réseau en parallèle (bornés), puis application séquentielle en base
             # (la session async n'est jamais utilisée de façon concurrente).
@@ -219,16 +295,15 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
                 async with sem:
                     return await probe_monitor(m, client)
 
-            results = await asyncio.gather(*[_probe(m) for m in all_monitors])
+            results = await asyncio.gather(*[_probe(m) for m in due])
 
-            now = datetime.now(timezone.utc)
-            for monitor, res in zip(all_monitors, results):
+            for monitor, res in zip(due, results):
                 apply_check_result(monitor, res, now, session)
 
-            # Alerting : détecte les transitions / SSL, envoie email+webhook, pose les
-            # drapeaux anti-répétition (persistés au commit ci-dessous).
-            alerts = evaluate_alerts(all_monitors, now)
-            await _sync_incidents(session, all_monitors, now)
+            # Alerting : UNIQUEMENT sur les monitors checkés ce tick — sinon on
+            # déclencherait de fausses transitions/incidents sur des monitors non sondés.
+            alerts = evaluate_alerts(due, now)
+            await _sync_incidents(session, due, now)
             await dispatch_alerts(client, alerts)
 
             await session.commit()
@@ -253,16 +328,27 @@ async def monitor_loop() -> None:
     # NB : last_cycle_at n'est PAS posé ici (au démarrage) — sinon un crash-loop qui
     # relance la boucle sans jamais finir un cycle garderait /health vert à tort.
     async with httpx.AsyncClient(follow_redirects=False) as client:
+        last_retention: float | None = None
+        last_heartbeat: float | None = None
         while True:
+            mono = asyncio.get_event_loop().time()
             try:
+                # Rétention : cadence lente, pas à chaque tick de 60s.
+                if last_retention is None or mono - last_retention >= RETENTION_INTERVAL_SECONDS:
+                    await _run_retention()
+                    last_retention = mono
                 await _run_one_cycle(client)
-                # Liveness : un cycle a ABOUTI. On réarme aussi le backoff de redémarrage.
+                # Liveness : le tick a abouti (même si aucun monitor n'était dû). On
+                # réarme aussi le backoff de redémarrage.
                 app.state.last_cycle_at = datetime.now(timezone.utc)
                 app.state.restart_count = 0
             except Exception:
                 logger.exception("Erreur inattendue dans la boucle de monitoring")
-            await _heartbeat(client)
-            await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+            # Heartbeat (dead-man switch) : cadence lente également.
+            if last_heartbeat is None or asyncio.get_event_loop().time() - last_heartbeat >= RETENTION_INTERVAL_SECONDS:
+                await _heartbeat(client)
+                last_heartbeat = asyncio.get_event_loop().time()
+            await asyncio.sleep(TICK_INTERVAL_SECONDS)
 
 
 def _spawn_monitor_loop() -> None:

@@ -74,6 +74,11 @@ async def create_monitor(
         url=str(payload.url),
         type=payload.type,
         expected_status_code=payload.expected_status_code,
+        check_interval_seconds=payload.check_interval_seconds,
+        keyword=payload.keyword,
+        keyword_mode=payload.keyword_mode,
+        latency_threshold_ms=payload.latency_threshold_ms,
+        port=payload.port,
         user_id=current_user.id,
     )
     db.add(monitor)
@@ -119,6 +124,11 @@ async def update_monitor(
     monitor.url = str(payload.url)
     monitor.type = payload.type
     monitor.expected_status_code = payload.expected_status_code
+    monitor.check_interval_seconds = payload.check_interval_seconds
+    monitor.keyword = payload.keyword
+    monitor.keyword_mode = payload.keyword_mode
+    monitor.latency_threshold_ms = payload.latency_threshold_ms
+    monitor.port = payload.port
 
     await db.commit()
     await db.refresh(monitor)

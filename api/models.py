@@ -53,6 +53,12 @@ class Monitor(Base):
         default="unknown",
     )
     expected_status_code = Column(Integer, nullable=False, default=200)
+    # M1 : configuration de check étendue
+    check_interval_seconds = Column(Integer, nullable=True)  # None = défaut global (CHECK_INTERVAL_SECONDS)
+    keyword = Column(String(255), nullable=True)  # texte attendu/interdit dans la réponse (type http)
+    keyword_mode = Column(String(10), nullable=False, default="present", server_default="present")  # present|absent
+    latency_threshold_ms = Column(Integer, nullable=True)  # alerte si latence au-dessus (None = off)
+    port = Column(Integer, nullable=True)  # cible TCP pour le type 'port'
     last_status_code = Column(Integer, nullable=True)
     last_latency_ms = Column(Integer, nullable=True)
     last_checked_at = Column(DateTime(timezone=True), nullable=True)
@@ -62,6 +68,7 @@ class Monitor(Base):
     down_alert_sent = Column(Boolean, nullable=False, default=False, server_default="0")
     down_since = Column(DateTime(timezone=True), nullable=True)
     ssl_alert_level = Column(Integer, nullable=True)  # dernier palier SSL (jours) alerté
+    latency_alert_sent = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

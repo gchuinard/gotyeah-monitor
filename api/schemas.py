@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, model_validator
 
 # Borne haute sur le mot de passe : Argon2 n'a pas de limite, mais hacher une
 # valeur énorme est un vecteur de DoS (coût CPU). 8 mini = minimum raisonnable.
@@ -50,14 +50,39 @@ class MonitorBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     url: HttpUrl
     type: Literal["http", "ping", "port"] = "http"
+    # None = intervalle global par défaut (CHECK_INTERVAL_SECONDS côté loop)
+    check_interval_seconds: Optional[int] = Field(default=None, ge=60, le=86400)
+    # Check de contenu (type http) : texte attendu (present) ou interdit (absent)
+    keyword: Optional[str] = Field(default=None, max_length=255)
+    keyword_mode: Literal["present", "absent"] = "present"
+    # Alerte si la latence dépasse ce seuil (None = pas d'alerte de latence)
+    latency_threshold_ms: Optional[int] = Field(default=None, ge=1, le=600000)
+    # Cible TCP pour le type 'port'
+    port: Optional[int] = Field(default=None, ge=1, le=65535)
+
+
+def _require_port_for_port_type(model: "MonitorBase") -> "MonitorBase":
+    # Validation côté écriture uniquement (pas sur MonitorRead) : un ancien monitor
+    # 'port' sans port en base ne doit pas faire échouer la lecture.
+    if model.type == "port" and model.port is None:
+        raise ValueError("Le port est requis pour un monitor de type 'port'.")
+    return model
 
 
 class MonitorCreate(MonitorBase):
     expected_status_code: int = Field(default=200, ge=100, le=599)
 
+    @model_validator(mode="after")
+    def _validate(self) -> "MonitorCreate":
+        return _require_port_for_port_type(self)
+
 
 class MonitorUpdate(MonitorBase):
     expected_status_code: int = Field(default=200, ge=100, le=599)
+
+    @model_validator(mode="after")
+    def _validate(self) -> "MonitorUpdate":
+        return _require_port_for_port_type(self)
 
 
 class MonitorRead(MonitorBase):
