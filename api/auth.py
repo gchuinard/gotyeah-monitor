@@ -137,6 +137,35 @@ async def get_current_user(
     return user
 
 
+async def get_user_flexible(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> models.User:
+    """Accepte un JWT (UI) OU un token d'API (préfixe 'gym_'). Pour les endpoints de
+    LECTURE — permet d'interroger l'API depuis Grafana/scripts sans le JWT."""
+    if token.startswith("gym_"):
+        result = await db.execute(
+            select(models.ApiToken).where(models.ApiToken.token_hash == _hash_token(token))
+        )
+        api_token = result.scalars().first()
+        if api_token is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token d'API invalide",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        api_token.last_used_at = datetime.now(timezone.utc)
+        await db.commit()
+        user = await db.get(models.User, api_token.user_id)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+            )
+        return user
+    return await get_current_user(token=token, db=db)
+
+
 @router.get("/me", response_model=schemas.UserRead)
 async def read_me(current_user: models.User = Depends(get_current_user)) -> schemas.UserRead:
     return current_user

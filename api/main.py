@@ -28,6 +28,7 @@ from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESH
 from routers import monitors
 from routers import groups
 from routers import public
+from routers import api_tokens
 from routers import admin
 from auth import router as auth_router
 
@@ -518,4 +519,5 @@ app.include_router(monitors.router)
 app.include_router(groups.router)
 app.include_router(public.manage_router)
 app.include_router(public.public_router)
+app.include_router(api_tokens.router)
 app.include_router(admin.router)

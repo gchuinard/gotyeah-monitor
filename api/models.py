@@ -33,6 +33,7 @@ class User(Base):
     monitors = relationship("Monitor", back_populates="user")
     monitor_groups = relationship("MonitorGroup", back_populates="user", cascade="all, delete-orphan")
     status_page = relationship("StatusPage", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    api_tokens = relationship("ApiToken", back_populates="user", cascade="all, delete-orphan")
     email_verifications = relationship("EmailVerification", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     email_change_requests = relationship("EmailChangeRequest", back_populates="user", cascade="all, delete-orphan")
@@ -201,6 +202,24 @@ class MonitorUptimeDaily(Base):
     day = Column(Date, nullable=False)
     up_count = Column(Integer, nullable=False)
     total_count = Column(Integer, nullable=False)
+
+
+class ApiToken(Base):
+    # Token d'API (lecture seule), haché au repos comme les tokens d'action. Le brut
+    # (préfixe 'gym_') n'est montré qu'une fois à la création.
+    __tablename__ = "api_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    prefix = Column(String(16), nullable=False)  # ex. 'gym_AbCdEf' pour l'affichage
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship("User", back_populates="api_tokens")
 
 
 class EmailVerification(Base):

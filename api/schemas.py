@@ -177,6 +177,25 @@ class MaintenanceWindowRead(BaseModel):
         from_attributes = True
 
 
+class ApiTokenCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class ApiTokenRead(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    last_used_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ApiTokenCreated(ApiTokenRead):
+    token: str  # token brut, renvoyé UNE seule fois à la création
+
+
 class UserWithMonitors(UserRead):
     monitors: List[MonitorRead] = []
 

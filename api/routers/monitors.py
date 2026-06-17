@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 import models
 import schemas
-from auth import get_current_user
+from auth import get_current_user, get_user_flexible
 
 router = APIRouter(prefix="/monitors", tags=["monitors"])
 
@@ -111,7 +111,7 @@ async def _validate_group(
 @router.get("", response_model=List[schemas.MonitorRead])
 async def list_monitors(
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.MonitorRead]:
     result = await db.execute(
         select(models.Monitor).where(models.Monitor.user_id == current_user.id)
@@ -155,7 +155,7 @@ async def create_monitor(
 async def get_monitor(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_user_flexible),
 ) -> schemas.MonitorRead:
     monitor = await db.get(models.Monitor, monitor_id)
     if not monitor:
@@ -228,7 +228,7 @@ async def delete_monitor(
 async def get_monitor_history(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.MonitorCheckRead]:
     monitor = await db.get(models.Monitor, monitor_id)
     if not monitor:
@@ -248,7 +248,7 @@ async def get_monitor_history(
 async def get_monitor_incidents(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.IncidentRead]:
     monitor = await db.get(models.Monitor, monitor_id)
     if not monitor:
@@ -269,7 +269,7 @@ async def get_monitor_incidents(
 async def get_monitor_sla(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.SlaMonth]:
     """Uptime mensuel (12 derniers mois) depuis le rollup quotidien."""
     monitor = await db.get(models.Monitor, monitor_id)
