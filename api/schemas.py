@@ -98,6 +98,8 @@ class MonitorRead(MonitorBase):
     # Pourcentage de disponibilité (None si aucun check sur la fenêtre).
     uptime_24h: Optional[float] = None
     uptime_7d: Optional[float] = None
+    uptime_30d: Optional[float] = None
+    uptime_90d: Optional[float] = None
     created_at: datetime
 
     class Config:
@@ -146,6 +148,11 @@ class IncidentRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SlaMonth(BaseModel):
+    month: str  # "YYYY-MM"
+    uptime: Optional[float] = None  # % (None si aucune donnée)
 
 
 class MessageResponse(BaseModel):

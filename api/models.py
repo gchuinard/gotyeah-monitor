@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Enum, DateTime, Date, Boolean, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -87,6 +87,8 @@ class Monitor(Base):
     # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
     uptime_24h = None
     uptime_7d = None
+    uptime_30d = None
+    uptime_90d = None
 
 
 class MonitorGroup(Base):
@@ -137,6 +139,23 @@ class Incident(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     monitor = relationship("Monitor", back_populates="incidents")
+
+
+class MonitorUptimeDaily(Base):
+    # Rollup quotidien des checks (1 ligne par monitor et par jour) : base de l'uptime
+    # 30j/90j et du SLA, alimenté avant que la rétention 7j ne purge monitor_checks.
+    __tablename__ = "monitor_uptime_daily"
+    __table_args__ = (
+        UniqueConstraint("monitor_id", "day", name="uq_monitor_uptime_daily_monitor_day"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    monitor_id = Column(
+        Integer, ForeignKey("monitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    day = Column(Date, nullable=False)
+    up_count = Column(Integer, nullable=False)
+    total_count = Column(Integer, nullable=False)
 
 
 class EmailVerification(Base):

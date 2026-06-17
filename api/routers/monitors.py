@@ -37,15 +37,44 @@ async def _uptime_pct(
     return out
 
 
+async def _rollup_pct(
+    db: AsyncSession, monitor_ids: List[int], since_day
+) -> Dict[int, Optional[float]]:
+    """{monitor_id: % d'uptime} depuis `since_day` (inclus), via la table de rollup
+    quotidien (monitor_uptime_daily) — pour les fenêtres longues (30j/90j)."""
+    if not monitor_ids:
+        return {}
+    stmt = (
+        select(
+            models.MonitorUptimeDaily.monitor_id,
+            func.sum(models.MonitorUptimeDaily.total_count).label("total"),
+            func.sum(models.MonitorUptimeDaily.up_count).label("up"),
+        )
+        .where(models.MonitorUptimeDaily.monitor_id.in_(monitor_ids))
+        .where(models.MonitorUptimeDaily.day >= since_day)
+        .group_by(models.MonitorUptimeDaily.monitor_id)
+    )
+    out: Dict[int, Optional[float]] = {}
+    for mid, total, up in (await db.execute(stmt)).all():
+        total = float(total or 0)
+        out[mid] = round(100.0 * float(up or 0) / total, 2) if total else None
+    return out
+
+
 async def _attach_uptime(db: AsyncSession, monitors: List[models.Monitor]) -> None:
-    """Calcule et attache uptime_24h / uptime_7d sur les instances (lecture seule)."""
+    """Attache uptime_24h/_7d (depuis monitor_checks) et uptime_30d/_90d (depuis le rollup)."""
     ids = [m.id for m in monitors]
     now = datetime.now(timezone.utc)
+    today = now.date()
     u24 = await _uptime_pct(db, ids, now - timedelta(hours=24))
     u7 = await _uptime_pct(db, ids, now - timedelta(days=7))
+    u30 = await _rollup_pct(db, ids, today - timedelta(days=30))
+    u90 = await _rollup_pct(db, ids, today - timedelta(days=90))
     for m in monitors:
         m.uptime_24h = u24.get(m.id)
         m.uptime_7d = u7.get(m.id)
+        m.uptime_30d = u30.get(m.id)
+        m.uptime_90d = u90.get(m.id)
 
 
 async def _validate_group(
@@ -212,3 +241,36 @@ async def get_monitor_incidents(
         .limit(50)
     )
     return list(result.scalars().all())
+
+
+@router.get("/{monitor_id}/sla", response_model=List[schemas.SlaMonth])
+async def get_monitor_sla(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> List[schemas.SlaMonth]:
+    """Uptime mensuel (12 derniers mois) depuis le rollup quotidien."""
+    monitor = await db.get(models.Monitor, monitor_id)
+    if not monitor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if monitor.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    month = func.date_format(models.MonitorUptimeDaily.day, "%Y-%m")
+    stmt = (
+        select(
+            month.label("month"),
+            func.sum(models.MonitorUptimeDaily.total_count).label("total"),
+            func.sum(models.MonitorUptimeDaily.up_count).label("up"),
+        )
+        .where(models.MonitorUptimeDaily.monitor_id == monitor_id)
+        .group_by(month)
+        .order_by(month.desc())
+        .limit(12)
+    )
+    out: List[schemas.SlaMonth] = []
+    for mo, total, up in (await db.execute(stmt)).all():
+        total = float(total or 0)
+        pct = round(100.0 * float(up or 0) / total, 2) if total else None
+        out.append(schemas.SlaMonth(month=mo, uptime=pct))
+    return out

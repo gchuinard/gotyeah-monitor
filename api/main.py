@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, case, insert
 from sqlalchemy.orm import selectinload
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,6 +66,9 @@ TICK_INTERVAL_SECONDS = 60
 RETENTION_INTERVAL_SECONDS = 600
 # Taille max de corps lue pour le check par mot-clé (anti-OOM sur le Pi).
 MAX_BODY_BYTES = 256 * 1024
+# Rollup uptime : nombre de jours complets récents recalculés à chaque agrégation
+# quotidienne. < HISTORY_RETENTION_DAYS (7) -> aucun jour n'est purgé avant d'être agrégé.
+ROLLUP_LOOKBACK_DAYS = 3
 HISTORY_RETENTION_DAYS = 7
 # Les incidents (clos) sont conservés bien plus longtemps que les checks (historique
 # long terme), mais bornés pour éviter une croissance illimitée de la table.
@@ -273,6 +276,46 @@ async def _run_retention() -> None:
         logger.exception("Échec du nettoyage de rétention")
 
 
+async def _run_rollup(now: datetime) -> None:
+    """Agrège les jours COMPLETS récents dans monitor_uptime_daily (delete+insert
+    idempotent), AVANT que la rétention 7j ne purge monitor_checks. Le jour courant
+    (incomplet) est exclu. Lookback (3) < rétention (7) -> jamais de perte de données."""
+    today = now.date()
+    start_day = today - timedelta(days=ROLLUP_LOOKBACK_DAYS)
+    start_dt = datetime(start_day.year, start_day.month, start_day.day, tzinfo=timezone.utc)
+    end_dt = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                delete(models.MonitorUptimeDaily).where(
+                    models.MonitorUptimeDaily.day >= start_day,
+                    models.MonitorUptimeDaily.day < today,
+                )
+            )
+            day_col = func.date(models.MonitorCheck.checked_at)
+            agg = (
+                select(
+                    models.MonitorCheck.monitor_id,
+                    day_col.label("day"),
+                    func.sum(case((models.MonitorCheck.status == "up", 1), else_=0)).label("up_count"),
+                    func.count().label("total_count"),
+                )
+                .where(
+                    models.MonitorCheck.checked_at >= start_dt,
+                    models.MonitorCheck.checked_at < end_dt,
+                )
+                .group_by(models.MonitorCheck.monitor_id, day_col)
+            )
+            await session.execute(
+                insert(models.MonitorUptimeDaily).from_select(
+                    ["monitor_id", "day", "up_count", "total_count"], agg
+                )
+            )
+            await session.commit()
+    except Exception:
+        logger.exception("Échec du rollup uptime quotidien")
+
+
 async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     async with AsyncSessionLocal() as session:
         try:
@@ -331,9 +374,15 @@ async def monitor_loop() -> None:
     async with httpx.AsyncClient(follow_redirects=False) as client:
         last_retention: float | None = None
         last_heartbeat: float | None = None
+        last_rollup_day = None
         while True:
             mono = asyncio.get_event_loop().time()
             try:
+                # Rollup uptime : une fois par jour (UTC), AVANT la rétention.
+                today = datetime.now(timezone.utc).date()
+                if last_rollup_day != today:
+                    await _run_rollup(datetime.now(timezone.utc))
+                    last_rollup_day = today
                 # Rétention : cadence lente, pas à chaque tick de 60s.
                 if last_retention is None or mono - last_retention >= RETENTION_INTERVAL_SECONDS:
                     await _run_retention()
