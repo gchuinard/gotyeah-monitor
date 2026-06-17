@@ -226,6 +226,15 @@
 	let profileStatusPageSubmitting = false;
 	let profileStatusPageError: string | null = null;
 	let profileStatusPageSuccess: string | null = null;
+	let profileApiTokens: {
+		id: number;
+		name: string;
+		prefix: string;
+		last_used_at: string | null;
+	}[] = [];
+	let profileNewTokenName = '';
+	let profileNewTokenRaw = '';
+	let profileTokenError: string | null = null;
 
 	async function openProfile() {
 		profileNewEmail = '';
@@ -246,6 +255,9 @@
 		profileStatusPageError = null;
 		profileStatusPageSuccess = null;
 		void loadStatusPage();
+		profileNewTokenRaw = '';
+		profileTokenError = null;
+		void loadApiTokens();
 
 		// Pré-remplit la config notifications actuelle (best-effort).
 		try {
@@ -258,6 +270,51 @@
 			}
 		} catch {
 			/* best-effort */
+		}
+	}
+
+	async function loadApiTokens() {
+		try {
+			const res = await apiFetch('/api-tokens');
+			if (res.ok) profileApiTokens = await res.json();
+		} catch {
+			/* best-effort */
+		}
+	}
+
+	async function createApiToken() {
+		if (!profileNewTokenName.trim()) return;
+		profileTokenError = null;
+		try {
+			const res = await apiFetch('/api-tokens', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: profileNewTokenName.trim() })
+			});
+			if (!res.ok) {
+				profileTokenError = await parseApiError(res, 'token API');
+				return;
+			}
+			const created = await res.json();
+			profileNewTokenRaw = created.token;
+			profileNewTokenName = '';
+			await loadApiTokens();
+		} catch (e) {
+			profileTokenError = parseNetworkError(e, 'token API');
+		}
+	}
+
+	async function deleteApiToken(id: number) {
+		profileTokenError = null;
+		try {
+			const res = await apiFetch(`/api-tokens/${id}`, { method: 'DELETE' });
+			if (!res.ok && res.status !== 204) {
+				profileTokenError = await parseApiError(res, 'token API');
+				return;
+			}
+			await loadApiTokens();
+		} catch (e) {
+			profileTokenError = e instanceof Error ? e.message : 'Erreur inconnue';
 		}
 	}
 
@@ -1330,6 +1387,55 @@
 						>
 					</div>
 				</form>
+
+				<!-- Tokens d'API -->
+				<div
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+				>
+					<p
+						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+					>
+						Tokens d'API (lecture)
+					</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+						Pour interroger l'API en lecture (Grafana, scripts) sans mot de passe. En-tête : <code
+							>Authorization: Bearer gym_…</code
+						>
+					</p>
+					{#if profileNewTokenRaw}
+						<div
+							class="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 flex flex-col gap-1"
+						>
+							<span class="text-amber-700 dark:text-amber-300"
+								>Copie ce token maintenant — il ne sera plus affiché :</span
+							>
+							<code class="break-all text-slate-800 dark:text-slate-100">{profileNewTokenRaw}</code>
+						</div>
+					{/if}
+					{#each profileApiTokens as t (t.id)}
+						<div class="flex items-center gap-2 text-xs">
+							<span class="font-medium text-slate-700 dark:text-slate-200">{t.name}</span>
+							<code class="text-slate-400">{t.prefix}…</code>
+							<span class="text-slate-400">{t.last_used_at ? 'utilisé' : 'jamais utilisé'}</span>
+							<button
+								type="button"
+								class="ml-auto text-rose-500 hover:text-rose-400"
+								on:click={() => deleteApiToken(t.id)}>Révoquer</button
+							>
+						</div>
+					{/each}
+					{#if profileTokenError}<p class="text-xs text-rose-500">{profileTokenError}</p>{/if}
+					<div class="flex items-center gap-2">
+						<input
+							class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							bind:value={profileNewTokenName}
+							placeholder="Nom du token"
+						/>
+						<button type="button" class="btn btn-sm btn-primary" on:click={createApiToken}
+							>Créer</button
+						>
+					</div>
+				</div>
 
 				<!-- Changer le mot de passe -->
 				<form
