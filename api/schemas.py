@@ -61,6 +61,8 @@ class MonitorBase(BaseModel):
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     # Groupe d'appartenance (None = sans groupe)
     group_id: Optional[int] = None
+    # Exposé sur la page de statut publique
+    is_public: bool = False
 
 
 def _require_port_for_port_type(model: "MonitorBase") -> "MonitorBase":
@@ -124,6 +126,32 @@ class MonitorGroupRead(MonitorGroupBase):
 
     class Config:
         from_attributes = True
+
+
+class StatusPageRead(BaseModel):
+    slug: str
+    title: str
+
+    class Config:
+        from_attributes = True
+
+
+class StatusPageUpdate(BaseModel):
+    slug: str = Field(min_length=3, max_length=64, pattern=r"^[a-z0-9-]+$")
+    title: str = Field(min_length=1, max_length=255)
+
+
+class PublicMonitorStatus(BaseModel):
+    name: str
+    status: str
+    uptime_24h: Optional[float] = None
+    uptime_30d: Optional[float] = None
+    has_open_incident: bool = False
+
+
+class PublicStatusResponse(BaseModel):
+    title: str
+    monitors: List[PublicMonitorStatus] = []
 
 
 class UserWithMonitors(UserRead):

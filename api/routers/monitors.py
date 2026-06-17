@@ -123,6 +123,7 @@ async def create_monitor(
         latency_threshold_ms=payload.latency_threshold_ms,
         port=payload.port,
         group_id=payload.group_id,
+        is_public=payload.is_public,
         user_id=current_user.id,
     )
     db.add(monitor)
@@ -176,6 +177,7 @@ async def update_monitor(
     monitor.latency_threshold_ms = payload.latency_threshold_ms
     monitor.port = payload.port
     monitor.group_id = payload.group_id
+    monitor.is_public = payload.is_public
 
     await db.commit()
     await db.refresh(monitor)

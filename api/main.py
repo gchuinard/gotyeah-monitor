@@ -27,6 +27,7 @@ from ssrf_guard import url_is_safe, host_is_safe
 from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD
 from routers import monitors
 from routers import groups
+from routers import public
 from routers import admin
 from auth import router as auth_router
 
@@ -501,4 +502,6 @@ async def health_head():
 app.include_router(auth_router)
 app.include_router(monitors.router)
 app.include_router(groups.router)
+app.include_router(public.manage_router)
+app.include_router(public.public_router)
 app.include_router(admin.router)

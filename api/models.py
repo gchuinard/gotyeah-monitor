@@ -32,6 +32,7 @@ class User(Base):
 
     monitors = relationship("Monitor", back_populates="user")
     monitor_groups = relationship("MonitorGroup", back_populates="user", cascade="all, delete-orphan")
+    status_page = relationship("StatusPage", back_populates="user", uselist=False, cascade="all, delete-orphan")
     email_verifications = relationship("EmailVerification", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     email_change_requests = relationship("EmailChangeRequest", back_populates="user", cascade="all, delete-orphan")
@@ -80,6 +81,8 @@ class Monitor(Base):
     # (ne les supprime pas).
     group_id = Column(Integer, ForeignKey("monitor_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     group = relationship("MonitorGroup", back_populates="monitors")
+    # Exposé sur la page de statut publique (sinon privé)
+    is_public = Column(Boolean, nullable=False, default=False, server_default="0")
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
     incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
 
@@ -104,6 +107,23 @@ class MonitorGroup(Base):
 
     user = relationship("User", back_populates="monitor_groups")
     monitors = relationship("Monitor", back_populates="group")
+
+
+class StatusPage(Base):
+    # Page de statut publique de l'utilisateur (une par user), accessible via /status/{slug}.
+    __tablename__ = "status_pages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    slug = Column(String(64), nullable=False, unique=True, index=True)
+    title = Column(String(255), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user = relationship("User", back_populates="status_page")
 
 
 class MonitorCheck(Base):
