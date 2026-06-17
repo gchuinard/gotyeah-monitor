@@ -82,7 +82,7 @@ async def _send(to: str, subject: str, html: str) -> None:
 
 
 async def send_verification_email(to: str, token: str) -> None:
-    link = f"{FRONTEND_URL}/verify-email?token={token}"
+    link = f"{FRONTEND_URL}/verify-email#token={token}"
     content = f"""
       <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
         Bienvenue sur <strong style="color:#0f172a;">GotYeah Monitor</strong> !<br/>
@@ -122,7 +122,7 @@ async def send_verification_email(to: str, token: str) -> None:
 
 async def send_email_change_confirm(to: str, token: str) -> None:
     """Mail envoyé à la NOUVELLE adresse pour confirmer le changement."""
-    link = f"{FRONTEND_URL}/confirm-email-change?token={token}"
+    link = f"{FRONTEND_URL}/confirm-email-change#token={token}"
     content = f"""
       <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
         Vous avez demandé à changer votre adresse email sur <strong style="color:#0f172a;">GotYeah Monitor</strong>.<br/>
@@ -162,7 +162,7 @@ async def send_email_change_confirm(to: str, token: str) -> None:
 
 async def send_email_change_cancel(to: str, token: str, new_email: str) -> None:
     """Mail envoyé à l'ANCIENNE adresse pour prévenir et permettre l'annulation."""
-    link = f"{FRONTEND_URL}/cancel-email-change?token={token}"
+    link = f"{FRONTEND_URL}/cancel-email-change#token={token}"
     content = f"""
       <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
         Une demande de changement d'adresse email a été effectuée sur votre compte.<br/>
@@ -205,7 +205,7 @@ async def send_email_change_cancel(to: str, token: str, new_email: str) -> None:
 
 
 async def send_password_reset_email(to: str, token: str) -> None:
-    link = f"{FRONTEND_URL}/reset-password?token={token}"
+    link = f"{FRONTEND_URL}/reset-password#token={token}"
     content = f"""
       <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
         Vous avez demandé la réinitialisation de votre mot de passe.<br/>
@@ -287,6 +287,40 @@ async def send_account_exists_notice(to: str) -> None:
         content=content,
     )
     await _send(to, "Tentative de création de compte – GotYeah Monitor", html)
+
+
+async def send_email_change_target_taken_notice(to: str) -> None:
+    """Mail envoyé au propriétaire d'une adresse que quelqu'un a tenté de définir
+    comme NOUVELLE adresse de son propre compte. Évite de révéler au demandeur que
+    l'adresse est déjà prise (anti-énumération), tout en prévenant le vrai titulaire."""
+    forgot_link = f"{FRONTEND_URL}/forgot-password"
+    content = f"""
+      <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+        Quelqu'un vient de tenter d'utiliser cette adresse email comme nouvelle adresse
+        d'un compte <strong style="color:#0f172a;">GotYeah Monitor</strong>.
+        Cette adresse étant déjà associée à votre compte, la demande a été ignorée.
+      </p>
+
+      <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+        <strong>Votre compte n'a pas été modifié</strong> et aucune action n'est requise.
+        Si vous pensez que votre mot de passe a pu être compromis, réinitialisez-le.
+      </p>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-top:8px;">
+        <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;">Mot de passe oublié ?</p>
+        <p style="margin:0;font-size:12px;color:#94a3b8;word-break:break-all;">{forgot_link}</p>
+      </div>
+
+      <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.6;">
+        Si vous n'êtes pas concerné, vous pouvez ignorer cet email.
+      </p>
+    """
+    html = _base_template(
+        title="Adresse email déjà utilisée",
+        preview="Une tentative d'utilisation de votre adresse a été faite sur un autre compte.",
+        content=content,
+    )
+    await _send(to, "Votre adresse email a été sollicitée – GotYeah Monitor", html)
 
 
 def _fmt_dt(dt: Optional[datetime]) -> str:

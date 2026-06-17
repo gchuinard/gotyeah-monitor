@@ -116,3 +116,9 @@ class ResetPasswordRequest(BaseModel):
 
 class ChangeEmailRequest(BaseModel):
     new_email: EmailStr
+
+
+class TokenRequest(BaseModel):
+    # Token d'action (vérif email / changement d'email) transmis dans le CORPS et non
+    # en query string, pour qu'il n'apparaisse pas dans les logs serveur/proxy.
+    token: str

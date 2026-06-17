@@ -7,7 +7,7 @@ import secrets
 import jwt
 from jwt import PyJWTError
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from mail_service import (
     send_password_reset_email,
     send_email_change_confirm,
     send_email_change_cancel,
+    send_email_change_target_taken_notice,
     send_account_exists_notice,
 )
 
@@ -194,14 +195,14 @@ async def register_user(
     return generic
 
 
-@router.get("/verify-email", response_model=schemas.MessageResponse)
+@router.post("/verify-email", response_model=schemas.MessageResponse)
 async def verify_email(
-    token: str,
+    payload: schemas.TokenRequest,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.EmailVerification).where(
-            models.EmailVerification.token == _hash_token(token)
+            models.EmailVerification.token == _hash_token(payload.token)
         )
     )
     verification = result.scalars().first()
@@ -239,6 +240,7 @@ async def verify_email(
 async def forgot_password(
     request: Request,
     payload: schemas.ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     user = await get_user_by_email(db, payload.email)
@@ -260,8 +262,10 @@ async def forgot_password(
             expires_at=expires,
         )
         db.add(reset_token)
-        await send_password_reset_email(user.email, token)
         await db.commit()
+        # Envoi différé : la latence SMTP ne doit pas dépendre de l'existence du
+        # compte, sinon elle sert d'oracle d'énumération (compte connu => réponse lente).
+        background_tasks.add_task(send_password_reset_email, user.email, token)
 
     return schemas.MessageResponse(
         message="Si cet email existe, un lien de réinitialisation a été envoyé."
@@ -366,21 +370,30 @@ async def update_me(
 @router.post("/change-email", response_model=schemas.MessageResponse)
 async def change_email(
     payload: schemas.ChangeEmailRequest,
+    background_tasks: BackgroundTasks,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
+    # Message renvoyé à l'identique quelle que soit la disponibilité de l'adresse
+    # (anti-énumération) : un utilisateur authentifié ne doit pas pouvoir sonder
+    # l'existence d'un compte via cet endpoint.
+    generic = schemas.MessageResponse(
+        message=f"Un email de confirmation a été envoyé à {payload.new_email}."
+    )
+
     if payload.new_email == current_user.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="C'est déjà votre adresse email.",
         )
 
-    existing = await get_user_by_email(db, payload.new_email)
+    existing = await get_user_by_email(db, str(payload.new_email))
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already in use",
-        )
+        # On ne révèle pas que l'adresse est déjà prise : on prévient le vrai
+        # propriétaire (envoi différé pour ne pas trahir l'existence par le timing)
+        # et on renvoie le même message générique que dans le cas nominal.
+        background_tasks.add_task(send_email_change_target_taken_notice, existing.email)
+        return generic
 
     # Annule toute demande précédente
     result = await db.execute(
@@ -404,24 +417,25 @@ async def change_email(
         expires_at=expires,
     )
     db.add(change_req)
-
-    await send_email_change_confirm(str(payload.new_email), confirm_token)
-    await send_email_change_cancel(current_user.email, cancel_token, str(payload.new_email))
     await db.commit()
 
-    return schemas.MessageResponse(
-        message=f"Un email de confirmation a été envoyé à {payload.new_email}."
+    # Envois différés (même raison de timing que la branche ci-dessus).
+    background_tasks.add_task(send_email_change_confirm, str(payload.new_email), confirm_token)
+    background_tasks.add_task(
+        send_email_change_cancel, current_user.email, cancel_token, str(payload.new_email)
     )
 
+    return generic
 
-@router.get("/confirm-email-change", response_model=schemas.MessageResponse)
+
+@router.post("/confirm-email-change", response_model=schemas.MessageResponse)
 async def confirm_email_change(
-    token: str,
+    payload: schemas.TokenRequest,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.EmailChangeRequest).where(
-            models.EmailChangeRequest.confirm_token == _hash_token(token)
+            models.EmailChangeRequest.confirm_token == _hash_token(payload.token)
         )
     )
     req = result.scalars().first()
@@ -446,14 +460,14 @@ async def confirm_email_change(
     return schemas.MessageResponse(message="Adresse email mise à jour. Vous pouvez vous connecter avec votre nouvelle adresse.")
 
 
-@router.get("/cancel-email-change", response_model=schemas.MessageResponse)
+@router.post("/cancel-email-change", response_model=schemas.MessageResponse)
 async def cancel_email_change(
-    token: str,
+    payload: schemas.TokenRequest,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
     result = await db.execute(
         select(models.EmailChangeRequest).where(
-            models.EmailChangeRequest.cancel_token == _hash_token(token)
+            models.EmailChangeRequest.cancel_token == _hash_token(payload.token)
         )
     )
     req = result.scalars().first()

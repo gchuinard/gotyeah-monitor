@@ -13,15 +13,18 @@ from auth import get_current_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+# Normalisé en minuscules des deux côtés : la comparaison d'email est insensible à
+# la casse (les emails ne sont pas normalisés au register, donc 'Admin@x' en env
+# doit matcher 'admin@x' enregistré).
 ADMIN_EMAILS = set(
-    e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+    e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
 )
 
 
 async def get_current_admin(
     current_user: models.User = Depends(get_current_user),
 ) -> models.User:
-    if current_user.email not in ADMIN_EMAILS:
+    if current_user.email.lower() not in ADMIN_EMAILS:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return current_user
 
@@ -30,7 +33,7 @@ async def get_current_admin(
 async def check_admin(
     current_user: models.User = Depends(get_current_user),
 ) -> dict:
-    return {"is_admin": current_user.email in ADMIN_EMAILS}
+    return {"is_admin": current_user.email.lower() in ADMIN_EMAILS}
 
 
 @router.put("/monitors/{monitor_id}", response_model=schemas.MonitorRead)

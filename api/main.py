@@ -41,13 +41,18 @@ _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    import traceback
-    content: dict = {"detail": str(exc) if _DEBUG else "Internal server error"}
-    if _DEBUG:
-        content["traceback"] = traceback.format_exc()
+    # La stacktrace est journalisée côté serveur, jamais renvoyée au client (même en
+    # debug) : elle ne doit pas fuiter via la réponse HTTP.
+    logging.getLogger("gotyeah.api").exception(
+        "Unhandled exception on %s %s", request.method, request.url.path
+    )
+    # Ce handler (Starlette ServerErrorMiddleware, niveau le plus externe) court-circuite
+    # le CORSMiddleware : on remet donc l'en-tête CORS à la main, en cohérence avec la
+    # politique globale allow_origins=["*"] (credentials désactivés) — sinon le front,
+    # servi sur un autre domaine, ne pourrait pas lire les réponses 500.
     return JSONResponse(
         status_code=500,
-        content=content,
+        content={"detail": str(exc) if _DEBUG else "Internal server error"},
         headers={"Access-Control-Allow-Origin": "*"},
     )
 
