@@ -23,9 +23,12 @@
 		started_at: string;
 		ended_at: string | null;
 		last_status_code: number | null;
+		acknowledged_at: string | null;
+		postmortem: string | null;
 	};
 	let incidents: IncidentEntry[] = [];
 	let incidentsLoaded = false;
+	let drafts: Record<number, string> = {};
 	type SlaEntry = { month: string; uptime: number | null };
 	let slaMonths: SlaEntry[] = [];
 	let slaLoaded = false;
@@ -41,11 +44,44 @@
 	async function loadIncidents() {
 		try {
 			const res = await apiFetch(`/monitors/${monitor.id}/incidents`);
-			if (res.ok) incidents = (await res.json()) as IncidentEntry[];
+			if (res.ok) {
+				incidents = (await res.json()) as IncidentEntry[];
+				drafts = Object.fromEntries(incidents.map((i) => [i.id, i.postmortem ?? '']));
+			}
 		} catch {
 			/* best-effort */
 		} finally {
 			incidentsLoaded = true;
+		}
+	}
+
+	async function ackIncident(inc: IncidentEntry) {
+		try {
+			const res = await apiFetch(`/monitors/${monitor.id}/incidents/${inc.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ acknowledged: !inc.acknowledged_at })
+			});
+			if (res.ok) {
+				const updated = await res.json();
+				inc.acknowledged_at = updated.acknowledged_at;
+				incidents = incidents;
+			}
+		} catch {
+			/* ignore */
+		}
+	}
+
+	async function savePostmortem(inc: IncidentEntry) {
+		try {
+			await apiFetch(`/monitors/${monitor.id}/incidents/${inc.id}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ postmortem: drafts[inc.id] ?? '' })
+			});
+			inc.postmortem = drafts[inc.id] ?? '';
+		} catch {
+			/* ignore */
 		}
 	}
 
@@ -698,28 +734,42 @@
 					<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
 						{#each incidents as inc (inc.id)}
 							<div
-								class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+								class="flex flex-col gap-1 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
 							>
-								<span
-									class={`w-1.5 h-1.5 rounded-full shrink-0 ${inc.ended_at ? 'bg-slate-500' : 'bg-red-400 animate-pulse'}`}
-								></span>
-								<span class={`font-medium ${inc.ended_at ? 'text-slate-400' : 'text-rose-300'}`}>
-									{inc.ended_at ? 'Résolu' : 'En cours'}
-								</span>
-								{#if inc.last_status_code}
-									<span class="text-slate-500 font-mono text-[11px]"
-										>code {inc.last_status_code}</span
+								<div class="flex items-center gap-2">
+									<span
+										class={`w-1.5 h-1.5 rounded-full shrink-0 ${inc.ended_at ? 'bg-slate-500' : 'bg-red-400 animate-pulse'}`}
+									></span>
+									<span class={`font-medium ${inc.ended_at ? 'text-slate-400' : 'text-rose-300'}`}
+										>{inc.ended_at ? 'Résolu' : 'En cours'}</span
 									>
-								{/if}
-								<span class="text-rose-300 font-mono text-[11px]">{incidentDuration(inc)}</span>
-								<span class="ml-auto text-slate-500 font-mono text-[11px]">
-									{toUtcDate(inc.started_at).toLocaleString('fr-FR', {
-										day: '2-digit',
-										month: '2-digit',
-										hour: '2-digit',
-										minute: '2-digit'
-									})}
-								</span>
+									{#if inc.last_status_code}<span class="text-slate-500 font-mono text-[11px]"
+											>code {inc.last_status_code}</span
+										>{/if}
+									<span class="text-rose-300 font-mono text-[11px]">{incidentDuration(inc)}</span>
+									<span class="ml-auto text-slate-500 font-mono text-[11px]"
+										>{toUtcDate(inc.started_at).toLocaleString('fr-FR', {
+											day: '2-digit',
+											month: '2-digit',
+											hour: '2-digit',
+											minute: '2-digit'
+										})}</span
+									>
+								</div>
+								<div class="flex items-center gap-2">
+									<button
+										type="button"
+										class={`text-[11px] shrink-0 ${inc.acknowledged_at ? 'text-emerald-400' : 'text-cyan-400 hover:text-cyan-300'}`}
+										on:click={() => ackIncident(inc)}
+										>{inc.acknowledged_at ? '✓ acquitté' : 'Acquitter'}</button
+									>
+									<input
+										class="flex-1 px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+										placeholder="Post-mortem / note…"
+										bind:value={drafts[inc.id]}
+										on:change={() => savePostmortem(inc)}
+									/>
+								</div>
 							</div>
 						{/each}
 					</div>
