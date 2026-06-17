@@ -16,12 +16,16 @@ ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
 
+# Injecte les hashes SHA-256 des scripts inline (calculés par SvelteKit) dans le header
+# CSP de nginx → CSP stricte en HEADER, synchro avec le HTML. Échoue le build si KO.
+RUN node inject-csp-hashes.js
+
 # --- Étape runtime : nginx sert les fichiers statiques. Aucun Node ni Vite
 #     dans l'image → les advisories de la toolchain de dev ne sont plus exposées. ---
 FROM nginx:1.27-alpine
 
-# Config SPA (fallback index.html) + en-têtes de sécurité + cache des assets
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Config SPA (fallback index.html) + en-têtes de sécurité (CSP stricte injectée au build)
+COPY --from=builder /app/nginx.conf.final /etc/nginx/conf.d/default.conf
 
 # Fichiers statiques produits par adapter-static
 COPY --from=builder /app/build /usr/share/nginx/html
