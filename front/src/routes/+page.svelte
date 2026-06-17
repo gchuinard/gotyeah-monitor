@@ -4,6 +4,8 @@
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import { apiFetch } from '$lib/utils/api';
 	import { modal } from '$lib/actions/modal';
+	import { groups, loadGroups } from '$lib/stores/groups';
+	import { groupCollapse, toggleGroupCollapse } from '$lib/stores/groupCollapse';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
@@ -28,6 +30,7 @@
 		keyword_mode: 'present' | 'absent' | null;
 		latency_threshold_ms: number | null;
 		port: number | null;
+		group_id: number | null;
 		created_at: string;
 	};
 
@@ -53,6 +56,7 @@
 	let addKeywordMode: 'present' | 'absent' = 'present';
 	let addLatencyThresholdMs: number | null = null;
 	let addPort: number | null = null;
+	let addGroupId: number | null = null;
 	let addSubmitting = false;
 	let addError: string | null = null;
 
@@ -66,6 +70,7 @@
 		addKeywordMode = 'present';
 		addLatencyThresholdMs = null;
 		addPort = null;
+		addGroupId = null;
 		addError = null;
 		showAdd = true;
 	}
@@ -86,7 +91,8 @@
 					keyword: addType === 'http' && addKeyword.trim() ? addKeyword.trim() : null,
 					keyword_mode: addKeywordMode,
 					latency_threshold_ms: addLatencyThresholdMs || null,
-					port: addType === 'port' ? addPort : null
+					port: addType === 'port' ? addPort : null,
+					group_id: addGroupId == null ? null : Number(addGroupId)
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -98,6 +104,77 @@
 			addSubmitting = false;
 		}
 	}
+
+	// ── Recherche + gestion des groupes (M2) ──────────────────────────────
+	let search = '';
+	let showGroups = false;
+	let newGroupName = '';
+	let groupActionError: string | null = null;
+
+	async function createGroup() {
+		const name = newGroupName.trim();
+		if (!name) return;
+		groupActionError = null;
+		try {
+			const res = await apiFetch('/groups', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!res.ok) {
+				groupActionError = await parseApiError(res, 'groupe');
+				return;
+			}
+			newGroupName = '';
+			await loadGroups();
+		} catch (e) {
+			groupActionError = parseNetworkError(e, 'groupe');
+		}
+	}
+
+	async function renameGroup(id: number, name: string) {
+		const n = name.trim();
+		if (!n) return;
+		try {
+			await apiFetch(`/groups/${id}`, {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name: n })
+			});
+			await loadGroups();
+		} catch {
+			/* ignore */
+		}
+	}
+
+	async function deleteGroup(id: number) {
+		try {
+			await apiFetch(`/groups/${id}`, { method: 'DELETE' });
+			await loadGroups();
+			await fetchMonitors();
+		} catch {
+			/* ignore */
+		}
+	}
+
+	$: q = search.trim().toLowerCase();
+	$: filteredMonitors = q
+		? $monitors.filter((m) => m.name.toLowerCase().includes(q) || m.url.toLowerCase().includes(q))
+		: $monitors;
+	$: groupSections = [
+		...$groups.map((g) => ({
+			key: String(g.id),
+			name: g.name,
+			items: filteredMonitors.filter((m) => m.groupId === g.id)
+		})),
+		{
+			key: 'ungrouped',
+			name: 'Sans groupe',
+			items: filteredMonitors.filter(
+				(m) => m.groupId == null || !$groups.some((g) => g.id === m.groupId)
+			)
+		}
+	].filter((sct) => sct.items.length > 0);
 
 	// Utilise la réactivité Svelte pour suivre le store auth
 	$: authState = $auth;
@@ -321,6 +398,7 @@
 					keywordMode: m.keyword_mode ?? 'present',
 					latencyThresholdMs: m.latency_threshold_ms,
 					port: m.port,
+					groupId: m.group_id,
 					createdAt: m.created_at
 				}))
 			);
@@ -349,6 +427,7 @@
 
 	onMount(() => {
 		fetchMonitors();
+		loadGroups();
 		checkAdmin();
 		preloadCode('/profile', '/add', '/login');
 	});
@@ -614,21 +693,71 @@
 				</button>
 			</div>
 		{:else}
-			<div
-				class={viewMode === 'grid'
-					? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 items-start'
-					: 'flex flex-col gap-4 p-8'}
-			>
-				{#each $monitors as m (m.id)}
-					<MonitorCard
-						{...m}
-						showDetails={openCardId === m.id}
-						onToggleDetails={() => toggleCardDetails(m.id)}
-						onDeleted={fetchMonitors}
-						compact={viewMode === 'list'}
-					/>
-				{/each}
+			<div class="flex items-center gap-2 px-8 pt-6">
+				<input
+					type="search"
+					bind:value={search}
+					placeholder="Rechercher un moniteur…"
+					class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+				/>
+				<button
+					type="button"
+					class="btn btn-sm btn-secondary whitespace-nowrap"
+					on:click={() => (showGroups = true)}
+				>
+					Gérer les groupes
+				</button>
 			</div>
+			{#if $groups.length === 0}
+				<div
+					class={viewMode === 'grid'
+						? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
+						: 'flex flex-col gap-4' + ' p-8'}
+				>
+					{#each filteredMonitors as m (m.id)}
+						<MonitorCard
+							{...m}
+							showDetails={openCardId === m.id}
+							onToggleDetails={() => toggleCardDetails(m.id)}
+							onDeleted={fetchMonitors}
+							compact={viewMode === 'list'}
+						/>
+					{/each}
+				</div>
+			{:else}
+				<div class="flex flex-col gap-2 p-8 pt-4">
+					{#each groupSections as section (section.key)}
+						<div>
+							<button
+								type="button"
+								class="flex items-center gap-2 w-full text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+								on:click={() => toggleGroupCollapse(section.key)}
+							>
+								<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
+								{section.name}
+								<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
+							</button>
+							{#if !$groupCollapse[section.key]}
+								<div
+									class={viewMode === 'grid'
+										? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
+										: 'flex flex-col gap-4' + ' pb-4'}
+								>
+									{#each section.items as m (m.id)}
+										<MonitorCard
+											{...m}
+											showDetails={openCardId === m.id}
+											onToggleDetails={() => toggleCardDetails(m.id)}
+											onDeleted={fetchMonitors}
+											compact={viewMode === 'list'}
+										/>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
@@ -745,6 +874,20 @@
 					</label>
 				</div>
 
+				{#if $groups.length > 0}
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Groupe</span>
+						<select
+							bind:value={addGroupId}
+							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+						>
+							<option value={null}>Sans groupe</option>
+							{#each $groups as g (g.id)}
+								<option value={g.id}>{g.name}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
 				{#if addType === 'http'}
 					<div class="grid grid-cols-2 gap-3">
 						<label class="flex flex-col gap-1">
@@ -804,6 +947,61 @@
 					</button>
 				</div>
 			</form>
+		</div>
+	</div>
+{/if}
+
+{#if showGroups}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40 px-4"
+		on:click={() => (showGroups = false)}
+		role="presentation"
+		use:modal={() => (showGroups = false)}
+	>
+		<div
+			class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-4"
+			on:click|stopPropagation
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="flex items-center justify-between">
+				<h2 class="font-semibold text-slate-900 dark:text-slate-50">Groupes</h2>
+				<button
+					type="button"
+					class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+					on:click={() => (showGroups = false)}>✕</button
+				>
+			</div>
+			<div class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
+				{#each $groups as g (g.id)}
+					<div class="flex items-center gap-2">
+						<input
+							class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							value={g.name}
+							on:change={(e) => renameGroup(g.id, e.currentTarget.value)}
+						/>
+						<button
+							type="button"
+							class="btn btn-sm btn-secondary"
+							on:click={() => deleteGroup(g.id)}>Suppr.</button
+						>
+					</div>
+				{/each}
+				{#if $groups.length === 0}
+					<p class="text-sm text-slate-400">Aucun groupe pour l'instant.</p>
+				{/if}
+			</div>
+			<form class="flex items-center gap-2" on:submit|preventDefault={createGroup}>
+				<input
+					class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+					bind:value={newGroupName}
+					placeholder="Nouveau groupe"
+				/>
+				<button type="submit" class="btn btn-sm btn-primary">Créer</button>
+			</form>
+			{#if groupActionError}
+				<p class="text-xs text-rose-500">{groupActionError}</p>
+			{/if}
 		</div>
 	</div>
 {/if}

@@ -3,6 +3,7 @@
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { apiFetch } from '$lib/utils/api';
 	import { modal } from '$lib/actions/modal';
+	import { groups } from '$lib/stores/groups';
 	import { onMount } from 'svelte';
 	import type { MonitorCardData } from '$lib/stores/monitors';
 
@@ -60,6 +61,7 @@
 	let editKeywordMode: 'present' | 'absent' = 'present';
 	let editLatencyThresholdMs: number | null = null;
 	let editPort: number | null = null;
+	let editGroupId: number | null = null;
 	let submitting = false;
 	let editError: string | null = null;
 
@@ -73,6 +75,7 @@
 		editKeywordMode = monitor.keywordMode ?? 'present';
 		editLatencyThresholdMs = monitor.latencyThresholdMs;
 		editPort = monitor.port;
+		editGroupId = monitor.groupId;
 		editError = null;
 		editing = true;
 	}
@@ -93,7 +96,8 @@
 					keyword: editType === 'http' && editKeyword.trim() ? editKeyword.trim() : null,
 					keyword_mode: editKeywordMode,
 					latency_threshold_ms: editLatencyThresholdMs || null,
-					port: editType === 'port' ? editPort : null
+					port: editType === 'port' ? editPort : null,
+					group_id: editGroupId == null ? null : Number(editGroupId)
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -278,6 +282,20 @@
 					</label>
 				</div>
 
+				{#if $groups.length > 0}
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-400 uppercase tracking-wide">Groupe</span>
+						<select
+							bind:value={editGroupId}
+							class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 text-sm"
+						>
+							<option value={null}>Sans groupe</option>
+							{#each $groups as g (g.id)}
+								<option value={g.id}>{g.name}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
 				{#if editType === 'http'}
 					<div class="grid grid-cols-2 gap-3">
 						<label class="flex flex-col gap-1">

@@ -28,6 +28,7 @@ export type MonitorCardData = {
 	keywordMode: 'present' | 'absent' | null;
 	latencyThresholdMs: number | null;
 	port: number | null;
+	groupId: number | null;
 	createdAt: string;
 };
 
