@@ -84,12 +84,14 @@ jobs:
 
             # Attend qu'un conteneur passe 'healthy' (s'appuie sur les healthchecks compose)
             wait_healthy() {
-              name="$1"; timeout=150; elapsed=0
+              # NB : pas de variable nommée 'status' — c'est une variable en lecture
+              # seule en zsh (alias de $?), l'assignation y échouerait.
+              cname="$1"; timeout=150; elapsed=0
               while true; do
-                status=$(docker inspect --format '{{.State.Health.Status}}' "$name" 2>/dev/null || echo absent)
-                [ "$status" = healthy ] && return 0
-                [ "$status" = absent ] && { echo "Conteneur $name introuvable"; return 1; }
-                [ "$elapsed" -ge "$timeout" ] && { echo "$name non healthy après ${timeout}s (état: $status)"; return 1; }
+                health=$(docker inspect --format '{{.State.Health.Status}}' "$cname" 2>/dev/null || echo absent)
+                [ "$health" = healthy ] && return 0
+                [ "$health" = absent ] && { echo "Conteneur $cname introuvable"; return 1; }
+                [ "$elapsed" -ge "$timeout" ] && { echo "$cname non healthy après ${timeout}s (état: $health)"; return 1; }
                 sleep 5; elapsed=$((elapsed + 5))
               done
             }
