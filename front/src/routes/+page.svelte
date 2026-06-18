@@ -65,7 +65,7 @@
 	let addSubmitting = false;
 	let addError: string | null = null;
 
-	function openAdd() {
+	function openAdd(groupId: number | null = null) {
 		addName = '';
 		addUrl = '';
 		addType = 'http';
@@ -75,7 +75,7 @@
 		addKeywordMode = 'present';
 		addLatencyThresholdMs = null;
 		addPort = null;
-		addGroupId = null;
+		addGroupId = groupId;
 		addIsPublic = false;
 		addError = null;
 		showAdd = true;
@@ -198,11 +198,13 @@
 	$: groupSections = [
 		...$groups.map((g) => ({
 			key: String(g.id),
+			groupId: g.id,
 			name: g.name,
 			items: filteredMonitors.filter((m) => m.groupId === g.id)
 		})),
 		{
 			key: 'ungrouped',
+			groupId: null,
 			name: 'Sans groupe',
 			items: filteredMonitors.filter(
 				(m) => m.groupId == null || !$groups.some((g) => g.id === m.groupId)
@@ -867,15 +869,35 @@
 			<div class="flex flex-col gap-2 p-8">
 				{#each groupSections as section (section.key)}
 					<div>
-						<button
-							type="button"
-							class="flex items-center gap-2 w-full text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
-							on:click={() => toggleGroupCollapse(section.key)}
-						>
-							<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
-							{section.name}
-							<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
-						</button>
+						<div class="flex items-center gap-1">
+							<button
+								type="button"
+								class="flex items-center gap-2 flex-1 text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+								on:click={() => toggleGroupCollapse(section.key)}
+							>
+								<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
+								{section.name}
+								<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
+							</button>
+							{#if section.groupId !== null}
+								<button
+									type="button"
+									class="h-6 w-6 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-500 hover:bg-cyan-500/10 transition-colors shrink-0"
+									title={`Ajouter un moniteur dans « ${section.name} »`}
+									on:click={() => openAdd(section.groupId)}
+								>
+									<svg
+										class="w-3.5 h-3.5"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										viewBox="0 0 24 24"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+									</svg>
+								</button>
+							{/if}
+						</div>
 						{#if !$groupCollapse[section.key]}
 							<div
 								class={(viewMode === 'grid'
