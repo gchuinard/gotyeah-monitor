@@ -606,7 +606,7 @@
 					{/if}
 
 					<!-- Journal d'incidents -->
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col gap-2 mt-8">
 						<div class="flex items-center justify-between">
 							<span class="eyebrow">Journal d'incidents</span>
 							{#if incidentsLoaded && incidents.length > 0}
@@ -670,7 +670,7 @@
 					</div>
 
 					<!-- Maintenance planifiée -->
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col gap-2 mt-8">
 						<span class="eyebrow">Maintenance planifiée</span>
 						{#if maintenanceLoaded && maintenanceWindows.length > 0}
 							<div class="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
