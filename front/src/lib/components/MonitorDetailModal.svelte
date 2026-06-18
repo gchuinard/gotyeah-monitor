@@ -515,6 +515,31 @@
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
 				<!-- ── Colonne gauche ──────────────────────────────────────────── -->
 				<div class="flex flex-col gap-4">
+					<!-- SLA mensuel -->
+					<div class="flex flex-col gap-2">
+						<span class="eyebrow">SLA mensuel</span>
+						{#if !slaLoaded}
+							<p class="text-xs text-slate-500">Chargement...</p>
+						{:else if slaMonths.length === 0}
+							<p class="text-xs text-slate-500">Pas encore de données mensuelles.</p>
+						{:else}
+							<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
+								{#each slaMonths as sla (sla.month)}
+									<div
+										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+									>
+										<span class="font-medium text-slate-300">{sla.month}</span>
+										<span
+											class={`ml-auto font-mono font-semibold tabular-nums ${sla.uptime === null ? 'text-slate-500' : sla.uptime >= 99.5 ? 'text-emerald-400' : sla.uptime >= 95 ? 'text-yellow-400' : 'text-red-400'}`}
+										>
+											{sla.uptime === null ? '—' : sla.uptime.toFixed(2) + '%'}
+										</span>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
 					<!-- Stats -->
 					<div class="grid grid-cols-3 gap-3">
 						<div
@@ -811,31 +836,6 @@
 												hour: '2-digit',
 												minute: '2-digit'
 											})}
-										</span>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
-
-					<!-- SLA mensuel -->
-					<div class="flex flex-col gap-2">
-						<span class="eyebrow">SLA mensuel</span>
-						{#if !slaLoaded}
-							<p class="text-xs text-slate-500">Chargement...</p>
-						{:else if slaMonths.length === 0}
-							<p class="text-xs text-slate-500">Pas encore de données mensuelles.</p>
-						{:else}
-							<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
-								{#each slaMonths as sla (sla.month)}
-									<div
-										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
-									>
-										<span class="font-medium text-slate-300">{sla.month}</span>
-										<span
-											class={`ml-auto font-mono font-semibold tabular-nums ${sla.uptime === null ? 'text-slate-500' : sla.uptime >= 99.5 ? 'text-emerald-400' : sla.uptime >= 95 ? 'text-yellow-400' : 'text-red-400'}`}
-										>
-											{sla.uptime === null ? '—' : sla.uptime.toFixed(2) + '%'}
 										</span>
 									</div>
 								{/each}
