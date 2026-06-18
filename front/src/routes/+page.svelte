@@ -1000,6 +1000,25 @@
 					{#each realSections as section (section.id)}
 						<div>
 							<div class="flex items-center gap-1">
+								{#if $sortMode === 'manual' && section.groupId !== null}
+									<span
+										class="cursor-grab text-slate-400 hover:text-slate-500 shrink-0 select-none"
+										aria-hidden="true"
+										title="Glisser pour réordonner le groupe"
+									>
+										<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+											<circle cx="7" cy="5" r="1.5" /><circle cx="13" cy="5" r="1.5" /><circle
+												cx="7"
+												cy="10"
+												r="1.5"
+											/><circle cx="13" cy="10" r="1.5" /><circle cx="7" cy="15" r="1.5" /><circle
+												cx="13"
+												cy="15"
+												r="1.5"
+											/>
+										</svg>
+									</span>
+								{/if}
 								<button
 									type="button"
 									class="flex items-center gap-2 flex-1 text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
@@ -1075,6 +1094,25 @@
 					{@const section = ungroupedSection}
 					<div>
 						<div class="flex items-center gap-1">
+							{#if $sortMode === 'manual' && section.groupId !== null}
+								<span
+									class="cursor-grab text-slate-400 hover:text-slate-500 shrink-0 select-none"
+									aria-hidden="true"
+									title="Glisser pour réordonner le groupe"
+								>
+									<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+										<circle cx="7" cy="5" r="1.5" /><circle cx="13" cy="5" r="1.5" /><circle
+											cx="7"
+											cy="10"
+											r="1.5"
+										/><circle cx="13" cy="10" r="1.5" /><circle cx="7" cy="15" r="1.5" /><circle
+											cx="13"
+											cy="15"
+											r="1.5"
+										/>
+									</svg>
+								</span>
+							{/if}
 							<button
 								type="button"
 								class="flex items-center gap-2 flex-1 text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
