@@ -580,188 +580,201 @@
 >
 	<div
 		class="w-full max-w-6xl mx-auto
-           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
-           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg
            overflow-hidden"
 	>
-		<div
-			class="flex items-center justify-between px-8 pt-7 pb-5 border-b border-slate-200/60 dark:border-slate-800/80"
-		>
-			<!-- Left: branding + title -->
-			<div class="flex flex-col gap-0.5">
-				<div
-					class="text-[10px] uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500 font-medium"
-				>
-					GotYeah Monitor
+		<div class="border-b border-slate-200/60 dark:border-slate-800/80">
+			<div class="flex items-center justify-between gap-4 px-8 pt-7 pb-4">
+				<!-- Left: branding + title -->
+				<div class="flex flex-col gap-0.5">
+					<div class="eyebrow">GotYeah Monitor</div>
+					<div class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
+						Moniteurs
+					</div>
 				</div>
-				<div class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">
-					Moniteurs
-				</div>
-			</div>
 
-			<!-- Right: actions -->
-			<div class="flex items-center gap-2">
-				<!-- View toggle -->
-				<div
-					class="flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 p-0.5 gap-0.5 cursor-pointer"
-					on:click={() => (viewMode = viewMode === 'grid' ? 'list' : 'grid')}
-					role="button"
-					tabindex="0"
-					on:keydown={(e) =>
-						e.key === 'Enter' && (viewMode = viewMode === 'grid' ? 'list' : 'grid')}
-				>
-					<span
-						class="rounded-full p-1.5 transition-all {viewMode === 'grid'
-							? 'bg-white dark:bg-slate-700 shadow-sm text-cyan-500'
-							: 'text-slate-400'}"
+				<!-- Right: actions -->
+				<div class="flex items-center gap-2">
+					<!-- View toggle -->
+					<div
+						class="flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 p-0.5 gap-0.5 cursor-pointer"
+						on:click={() => (viewMode = viewMode === 'grid' ? 'list' : 'grid')}
+						role="button"
+						tabindex="0"
+						on:keydown={(e) =>
+							e.key === 'Enter' && (viewMode = viewMode === 'grid' ? 'list' : 'grid')}
 					>
-						<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
-							<rect x="1" y="1" width="6" height="6" rx="1" /><rect
-								x="9"
-								y="1"
-								width="6"
-								height="6"
-								rx="1"
-							/><rect x="1" y="9" width="6" height="6" rx="1" /><rect
-								x="9"
-								y="9"
-								width="6"
-								height="6"
-								rx="1"
+						<span
+							class="rounded-full p-1.5 transition-all {viewMode === 'grid'
+								? 'bg-white dark:bg-slate-700 shadow-sm text-cyan-500'
+								: 'text-slate-400'}"
+						>
+							<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+								<rect x="1" y="1" width="6" height="6" rx="1" /><rect
+									x="9"
+									y="1"
+									width="6"
+									height="6"
+									rx="1"
+								/><rect x="1" y="9" width="6" height="6" rx="1" /><rect
+									x="9"
+									y="9"
+									width="6"
+									height="6"
+									rx="1"
+								/>
+							</svg>
+						</span>
+						<span
+							class="rounded-full p-1.5 transition-all {viewMode === 'list'
+								? 'bg-white dark:bg-slate-700 shadow-sm text-cyan-500'
+								: 'text-slate-400'}"
+						>
+							<svg
+								class="w-3.5 h-3.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								viewBox="0 0 16 16"
+							>
+								<line x1="3" y1="4" x2="13" y2="4" /><line x1="3" y1="8" x2="13" y2="8" /><line
+									x1="3"
+									y1="12"
+									x2="13"
+									y2="12"
+								/>
+							</svg>
+						</span>
+					</div>
+
+					<!-- Refresh -->
+					<button
+						type="button"
+						class="h-8 w-8 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all disabled:opacity-40"
+						on:click={fetchMonitors}
+						disabled={loading}
+						title="Rafraîchir"
+					>
+						<svg
+							class="w-3.5 h-3.5 {loading ? 'animate-spin' : ''}"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 							/>
 						</svg>
-					</span>
-					<span
-						class="rounded-full p-1.5 transition-all {viewMode === 'list'
-							? 'bg-white dark:bg-slate-700 shadow-sm text-cyan-500'
-							: 'text-slate-400'}"
+					</button>
+
+					<!-- Separator -->
+					<div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+					<!-- Admin badge -->
+					{#if isAdmin}
+						<button
+							type="button"
+							class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
+							   bg-amber-500 hover:bg-amber-400 text-white
+							   shadow-[0_4px_14px_-3px_rgba(251,191,36,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(251,191,36,0.55)]
+							   transition-all"
+							on:click={() => goto('/admin')}
+						>
+							<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+								<path
+									fill-rule="evenodd"
+									d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+							Admin
+						</button>
+					{/if}
+
+					<!-- Add button -->
+					<button
+						type="button"
+						class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
+						   bg-cyan-500 hover:bg-cyan-400 text-white
+						   shadow-[0_4px_14px_-3px_rgba(34,211,238,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(34,211,238,0.55)]
+						   transition-all"
+						on:click={openAdd}
 					>
 						<svg
 							class="w-3.5 h-3.5"
 							fill="none"
 							stroke="currentColor"
-							stroke-width="2"
-							viewBox="0 0 16 16"
+							stroke-width="3"
+							viewBox="0 0 24 24"
 						>
-							<line x1="3" y1="4" x2="13" y2="4" /><line x1="3" y1="8" x2="13" y2="8" /><line
-								x1="3"
-								y1="12"
-								x2="13"
-								y2="12"
-							/>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
 						</svg>
-					</span>
-				</div>
+						Ajouter
+					</button>
 
-				<!-- Refresh -->
-				<button
-					type="button"
-					class="h-8 w-8 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all disabled:opacity-40"
-					on:click={fetchMonitors}
-					disabled={loading}
-					title="Rafraîchir"
-				>
-					<svg
-						class="w-3.5 h-3.5 {loading ? 'animate-spin' : ''}"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2.5"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-						/>
-					</svg>
-				</button>
+					<!-- Separator -->
+					<div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-				<!-- Separator -->
-				<div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-
-				<!-- Admin badge -->
-				{#if isAdmin}
+					<!-- Profile -->
 					<button
 						type="button"
-						class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
-							   bg-amber-500 hover:bg-amber-400 text-white
-							   shadow-[0_0_20px_rgba(251,191,36,0.4)] hover:shadow-[0_0_28px_rgba(251,191,36,0.6)]
-							   transition-all"
-						on:click={() => goto('/admin')}
+						class="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all"
+						on:click={openProfile}
 					>
-						<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+						<span
+							class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-white text-xs font-bold shadow"
+						>
+							{authState?.user?.email?.[0]?.toUpperCase() ?? '?'}
+						</span>
+						<span class="text-xs text-slate-600 dark:text-slate-300 max-w-[120px] truncate">
+							{authState?.user?.email ?? 'Profil'}
+						</span>
+					</button>
+
+					<!-- Logout -->
+					<button
+						type="button"
+						class="h-8 w-8 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-700 transition-all"
+						on:click={logout}
+						title="Déconnexion"
+					>
+						<svg
+							class="w-3.5 h-3.5"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+							viewBox="0 0 24 24"
+						>
 							<path
-								fill-rule="evenodd"
-								d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z"
-								clip-rule="evenodd"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
 							/>
 						</svg>
-						Admin
 					</button>
-				{/if}
-
-				<!-- Add button -->
-				<button
-					type="button"
-					class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
-						   bg-cyan-500 hover:bg-cyan-400 text-white
-						   shadow-[0_0_20px_rgba(34,211,238,0.4)] hover:shadow-[0_0_28px_rgba(34,211,238,0.6)]
-						   transition-all"
-					on:click={openAdd}
-				>
-					<svg
-						class="w-3.5 h-3.5"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="3"
-						viewBox="0 0 24 24"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-					</svg>
-					Ajouter
-				</button>
-
-				<!-- Separator -->
-				<div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-
-				<!-- Profile -->
-				<button
-					type="button"
-					class="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all"
-					on:click={openProfile}
-				>
-					<span
-						class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 text-white text-xs font-bold shadow"
-					>
-						{authState?.user?.email?.[0]?.toUpperCase() ?? '?'}
-					</span>
-					<span class="text-xs text-slate-600 dark:text-slate-300 max-w-[120px] truncate">
-						{authState?.user?.email ?? 'Profil'}
-					</span>
-				</button>
-
-				<!-- Logout -->
-				<button
-					type="button"
-					class="h-8 w-8 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 text-slate-400 hover:text-rose-500 hover:border-rose-300 dark:hover:border-rose-700 transition-all"
-					on:click={logout}
-					title="Déconnexion"
-				>
-					<svg
-						class="w-3.5 h-3.5"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2.5"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-						/>
-					</svg>
-				</button>
+				</div>
 			</div>
+			{#if loading || $monitors.length > 0}
+				<div class="flex items-center gap-2 px-8 pb-5">
+					<input
+						type="search"
+						bind:value={search}
+						placeholder="Rechercher un moniteur…"
+						class="field flex-1"
+					/>
+					<button
+						type="button"
+						class="btn btn-sm btn-secondary whitespace-nowrap"
+						on:click={() => (showGroups = true)}
+					>
+						Gérer les groupes
+					</button>
+				</div>
+			{/if}
 		</div>
 
 		{#if error}
@@ -816,7 +829,7 @@
 					type="button"
 					class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold
 						   bg-cyan-500 hover:bg-cyan-400 text-white
-						   shadow-[0_0_24px_rgba(34,211,238,0.45)] hover:shadow-[0_0_32px_rgba(34,211,238,0.65)]
+						   shadow-[0_4px_14px_-3px_rgba(34,211,238,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(34,211,238,0.55)]
 						   transition-all"
 					on:click={openAdd}
 				>
@@ -832,76 +845,59 @@
 					Ajouter un moniteur
 				</button>
 			</div>
-		{:else}
-			<div class="relative z-10 flex items-center gap-2 px-8 pt-6 pb-1">
-				<input
-					type="search"
-					bind:value={search}
-					placeholder="Rechercher un moniteur…"
-					class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-				/>
-				<button
-					type="button"
-					class="btn btn-sm btn-secondary whitespace-nowrap"
-					on:click={() => (showGroups = true)}
-				>
-					Gérer les groupes
-				</button>
+		{:else if $groups.length === 0}
+			<div
+				class={(viewMode === 'grid'
+					? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
+					: 'flex flex-col gap-4') + ' p-8'}
+			>
+				{#each filteredMonitors as m (m.id)}
+					<MonitorCard
+						{...m}
+						showDetails={openCardId === m.id}
+						onToggleDetails={() => toggleCardDetails(m.id)}
+						onDeleted={fetchMonitors}
+						groups={$groups}
+						onAssignGroup={assignGroup}
+						compact={viewMode === 'list'}
+					/>
+				{/each}
 			</div>
-			{#if $groups.length === 0}
-				<div
-					class={(viewMode === 'grid'
-						? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
-						: 'flex flex-col gap-4') + ' p-8'}
-				>
-					{#each filteredMonitors as m (m.id)}
-						<MonitorCard
-							{...m}
-							showDetails={openCardId === m.id}
-							onToggleDetails={() => toggleCardDetails(m.id)}
-							onDeleted={fetchMonitors}
-							groups={$groups}
-							onAssignGroup={assignGroup}
-							compact={viewMode === 'list'}
-						/>
-					{/each}
-				</div>
-			{:else}
-				<div class="flex flex-col gap-2 p-8 pt-4">
-					{#each groupSections as section (section.key)}
-						<div>
-							<button
-								type="button"
-								class="flex items-center gap-2 w-full text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
-								on:click={() => toggleGroupCollapse(section.key)}
+		{:else}
+			<div class="flex flex-col gap-2 p-8">
+				{#each groupSections as section (section.key)}
+					<div>
+						<button
+							type="button"
+							class="flex items-center gap-2 w-full text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+							on:click={() => toggleGroupCollapse(section.key)}
+						>
+							<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
+							{section.name}
+							<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
+						</button>
+						{#if !$groupCollapse[section.key]}
+							<div
+								class={(viewMode === 'grid'
+									? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
+									: 'flex flex-col gap-4') + ' pb-4'}
 							>
-								<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
-								{section.name}
-								<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
-							</button>
-							{#if !$groupCollapse[section.key]}
-								<div
-									class={(viewMode === 'grid'
-										? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
-										: 'flex flex-col gap-4') + ' pb-4'}
-								>
-									{#each section.items as m (m.id)}
-										<MonitorCard
-											{...m}
-											showDetails={openCardId === m.id}
-											onToggleDetails={() => toggleCardDetails(m.id)}
-											onDeleted={fetchMonitors}
-											groups={$groups}
-											onAssignGroup={assignGroup}
-											compact={viewMode === 'list'}
-										/>
-									{/each}
-								</div>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{/if}
+								{#each section.items as m (m.id)}
+									<MonitorCard
+										{...m}
+										showDetails={openCardId === m.id}
+										onToggleDetails={() => toggleCardDetails(m.id)}
+										onDeleted={fetchMonitors}
+										groups={$groups}
+										onAssignGroup={assignGroup}
+										compact={viewMode === 'list'}
+									/>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		{/if}
 	</div>
 </div>
@@ -927,7 +923,7 @@
 		<div
 			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto"
+                   shadow-soft-lg p-6 flex flex-col gap-5 max-h-[90vh] overflow-y-auto"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -954,17 +950,12 @@
 			<form class="flex flex-col gap-3" on:submit|preventDefault={submitAdd}>
 				<label class="flex flex-col gap-1">
 					<span class="text-xs text-slate-500 dark:text-slate-400">Nom</span>
-					<input
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						bind:value={addName}
-						placeholder="Ex: Backend API"
-						required
-					/>
+					<input class="field" bind:value={addName} placeholder="Ex: Backend API" required />
 				</label>
 				<label class="flex flex-col gap-1">
 					<span class="text-xs text-slate-500 dark:text-slate-400">URL</span>
 					<input
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+						class="field"
 						bind:value={addUrl}
 						placeholder="https://example.com/health"
 						required
@@ -973,10 +964,7 @@
 				<div class="grid grid-cols-2 gap-3">
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Type</span>
-						<select
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={addType}
-						>
+						<select class="field" bind:value={addType}>
 							<option value="http">HTTP</option>
 							<option value="ping">Ping</option>
 							<option value="port">Port</option>
@@ -988,7 +976,7 @@
 							type="number"
 							min="100"
 							max="599"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={addExpectedStatusCode}
 						/>
 					</label>
@@ -1001,7 +989,7 @@
 							type="number"
 							min="60"
 							max="86400"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={addCheckIntervalSeconds}
 							placeholder="600 (défaut)"
 						/>
@@ -1011,7 +999,7 @@
 						<input
 							type="number"
 							min="1"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={addLatencyThresholdMs}
 							placeholder="désactivé"
 						/>
@@ -1027,10 +1015,7 @@
 				{#if $groups.length > 0}
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Groupe</span>
-						<select
-							bind:value={addGroupId}
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						>
+						<select bind:value={addGroupId} class="field">
 							<option value={null}>Sans groupe</option>
 							{#each $groups as g (g.id)}
 								<option value={g.id}>{g.name}</option>
@@ -1043,17 +1028,14 @@
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-slate-500 dark:text-slate-400">Mot-clé</span>
 							<input
-								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								class="field"
 								bind:value={addKeyword}
 								placeholder="texte attendu (optionnel)"
 							/>
 						</label>
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-slate-500 dark:text-slate-400">Mode</span>
-							<select
-								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-								bind:value={addKeywordMode}
-							>
+							<select class="field" bind:value={addKeywordMode}>
 								<option value="present">doit être présent</option>
 								<option value="absent">doit être absent</option>
 							</select>
@@ -1068,7 +1050,7 @@
 							type="number"
 							min="1"
 							max="65535"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={addPort}
 							placeholder="ex: 5432"
 							required
@@ -1109,7 +1091,7 @@
 		use:modal={() => (showGroups = false)}
 	>
 		<div
-			class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-[0_0_60px_rgba(56,189,248,0.25)] p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+			class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-soft-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -1125,11 +1107,11 @@
 			<div class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto">
 				{#each $groups as g (g.id)}
 					<div
-						class="flex flex-col gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 p-2"
+						class="flex flex-col gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 p-2"
 					>
 						<div class="flex items-center gap-2">
 							<input
-								class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								class="flex-1 field"
 								value={g.name}
 								on:change={(e) => renameGroup(g.id, e.currentTarget.value)}
 							/>
@@ -1169,11 +1151,7 @@
 				{/if}
 			</div>
 			<form class="flex items-center gap-2" on:submit|preventDefault={createGroup}>
-				<input
-					class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-					bind:value={newGroupName}
-					placeholder="Nouveau groupe"
-				/>
+				<input class="flex-1 field" bind:value={newGroupName} placeholder="Nouveau groupe" />
 				<button type="submit" class="btn btn-sm btn-primary">Créer</button>
 			</form>
 			{#if groupActionError}
@@ -1194,7 +1172,7 @@
 			class="w-full max-w-lg rounded-2xl overflow-hidden
                    bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_60px_rgba(56,189,248,0.25)]"
+                   shadow-soft-lg"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -1225,11 +1203,7 @@
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
 					on:submit|preventDefault={submitEmailChange}
 				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
-					>
-						Adresse email
-					</p>
+					<p class="eyebrow">Adresse email</p>
 
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Email actuel</span>
@@ -1245,7 +1219,7 @@
 						<span class="text-xs text-slate-500 dark:text-slate-400">Nouvelle adresse email</span>
 						<input
 							type="email"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={profileNewEmail}
 							placeholder="nouvelle@adresse.com"
 							required
@@ -1305,11 +1279,7 @@
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
 					on:submit|preventDefault={saveNotifications}
 				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
-					>
-						Notifications
-					</p>
+					<p class="eyebrow">Notifications</p>
 					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
 						Les alertes (panne, rétablissement, expiration SSL) sont envoyées par email, et en
 						option via un webhook.
@@ -1338,10 +1308,7 @@
 
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Webhook (type)</span>
-						<select
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={profileWebhookKind}
-						>
+						<select class="field" bind:value={profileWebhookKind}>
 							<option value="discord">Discord</option>
 							<option value="slack">Slack</option>
 							<option value="ntfy">ntfy</option>
@@ -1355,7 +1322,7 @@
 						>
 						<input
 							type="url"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={profileWebhookUrl}
 							placeholder="https://discord.com/api/webhooks/..."
 						/>
@@ -1392,27 +1359,19 @@
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
 					on:submit|preventDefault={saveStatusPage}
 				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
-					>
-						Page publique
-					</p>
+					<p class="eyebrow">Page publique</p>
 					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
 						Publie une page de statut accessible sans connexion, listant les moniteurs marqués «
 						publics ».
 					</p>
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Identifiant d'URL (slug)</span>
-						<input
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={profileStatusPageSlug}
-							placeholder="mon-statut"
-						/>
+						<input class="field" bind:value={profileStatusPageSlug} placeholder="mon-statut" />
 					</label>
 					<label class="flex flex-col gap-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Titre</span>
 						<input
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field"
 							bind:value={profileStatusPageTitle}
 							placeholder="Statut de mes services"
 						/>
@@ -1450,11 +1409,7 @@
 				<div
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
 				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
-					>
-						Tokens d'API (lecture)
-					</p>
+					<p class="eyebrow">Tokens d'API (lecture)</p>
 					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
 						Pour interroger l'API en lecture (Grafana, scripts) sans mot de passe. En-tête : <code
 							>Authorization: Bearer gym_…</code
@@ -1485,7 +1440,7 @@
 					{#if profileTokenError}<p class="text-xs text-rose-500">{profileTokenError}</p>{/if}
 					<div class="flex items-center gap-2">
 						<input
-							class="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="flex-1 field"
 							bind:value={profileNewTokenName}
 							placeholder="Nom du token"
 						/>
@@ -1500,18 +1455,14 @@
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
 					on:submit|preventDefault={savePassword}
 				>
-					<p
-						class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
-					>
-						Mot de passe
-					</p>
+					<p class="eyebrow">Mot de passe</p>
 
 					<div class="flex flex-col gap-1">
 						<label class="flex flex-col gap-1">
 							<span class="text-xs text-slate-500 dark:text-slate-400">Nouveau mot de passe</span>
 							<input
 								type="password"
-								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+								class="field"
 								bind:value={profilePassword}
 								placeholder="Nouveau mot de passe"
 							/>
@@ -1526,7 +1477,7 @@
 							>
 							<input
 								type="password"
-								class="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500
+								class="field
 									{profileConfirmPassword && !profilePasswordsMatch ? 'border-rose-400 ring-2 ring-rose-200' : ''}"
 								bind:value={profileConfirmPassword}
 								placeholder="Répétez le mot de passe"

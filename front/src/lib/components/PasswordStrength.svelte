@@ -26,8 +26,8 @@
 	{#each rules as rule (rule.key)}
 		<li
 			class="flex items-center gap-1.5 text-xs {checks[rule.key]
-				? 'text-emerald-600'
-				: 'text-slate-400'}"
+				? 'text-emerald-600 dark:text-emerald-400'
+				: 'text-slate-400 dark:text-slate-500'}"
 		>
 			{#if checks[rule.key]}
 				<svg

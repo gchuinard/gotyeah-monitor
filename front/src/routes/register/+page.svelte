@@ -37,38 +37,28 @@
 <div class="min-h-screen flex items-center justify-center py-10">
 	<div
 		class="w-full max-w-md mx-auto p-8
-           rounded-3xl bg-white/85 backdrop-blur-2xl
-           border border-white/70 shadow-[0_0_60px_rgba(56,189,248,0.3)]"
+           rounded-3xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg"
 	>
 		<div class="flex flex-col gap-1 mb-6">
-			<div class="text-xs uppercase tracking-[0.25em] text-slate-400">GotYeah Monitor</div>
-			<h1 class="text-2xl font-semibold text-slate-900">Créer un compte</h1>
+			<div class="eyebrow">GotYeah Monitor</div>
+			<h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Créer un compte</h1>
 		</div>
 
 		<form class="flex flex-col gap-4" on:submit|preventDefault={onSubmit}>
 			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600">Email</span>
-				<input
-					type="email"
-					class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-					bind:value={email}
-					required
-				/>
+				<span class="text-sm text-slate-600 dark:text-slate-300">Email</span>
+				<input type="email" class="field" bind:value={email} required />
 			</label>
 
 			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600">Mot de passe</span>
-				<input
-					type="password"
-					class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-					bind:value={password}
-					required
-				/>
+				<span class="text-sm text-slate-600 dark:text-slate-300">Mot de passe</span>
+				<input type="password" class="field" bind:value={password} required />
 			</label>
 
 			{#if error}
 				<div
-					class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2"
+					class="flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
 				>
 					<svg
 						class="w-4 h-4 shrink-0 mt-0.5"
@@ -89,7 +79,7 @@
 
 			{#if success}
 				<div
-					class="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2"
+					class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30"
 				>
 					<svg
 						class="w-4 h-4 shrink-0"
@@ -113,11 +103,11 @@
 			</button>
 		</form>
 
-		<div class="mt-4 text-xs text-slate-500">
+		<div class="mt-4 text-xs text-slate-500 dark:text-slate-400">
 			Déjà un compte ?
 			<button
 				type="button"
-				class="text-cyan-600 hover:text-cyan-500 underline"
+				class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 underline"
 				on:click={() => goto('/login')}
 			>
 				Se connecter

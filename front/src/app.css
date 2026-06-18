@@ -39,11 +39,12 @@
 
 	.btn-primary {
 		@apply bg-cyan-500 hover:bg-cyan-400 text-white border border-cyan-300
-      shadow-[0_0_20px_rgba(34,211,238,0.75)];
+      shadow-[0_4px_14px_-3px_rgba(34,211,238,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(34,211,238,0.55)];
 	}
 
 	.btn-secondary {
-		@apply bg-white/70 hover:bg-white text-slate-700 border border-slate-200 shadow-sm;
+		@apply bg-white/70 hover:bg-white text-slate-700 border border-slate-200 shadow-sm
+      dark:bg-slate-800/70 dark:hover:bg-slate-800 dark:text-slate-200 dark:border-slate-700;
 	}
 
 	.btn-ghost {
@@ -52,10 +53,47 @@
 
 	.btn-danger {
 		@apply bg-rose-500/90 hover:bg-rose-500 text-white border border-rose-300
-      shadow-[0_0_18px_rgba(244,63,94,0.6)];
+      shadow-[0_4px_14px_-3px_rgba(244,63,94,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(244,63,94,0.55)];
 	}
 
 	.btn-muted {
-		@apply bg-white/60 hover:bg-white text-slate-600 border border-slate-200 shadow-sm;
+		@apply bg-white/60 hover:bg-white text-slate-600 border border-slate-200 shadow-sm
+      dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-300 dark:border-slate-700;
+	}
+
+	/* --- Primitives partagées (ravalement 2026) : glow discipliné + cohérence --- */
+
+	/* Sur-titre / label en petites capitales espacées */
+	.eyebrow {
+		@apply text-[10px] uppercase tracking-[0.25em] font-medium text-slate-400 dark:text-slate-500;
+	}
+
+	/* Champ de saisie cohérent (inputs/selects/textarea) — theme-aware */
+	.field {
+		@apply w-full rounded-xl border border-slate-200 dark:border-slate-700
+      bg-slate-50 dark:bg-slate-800/80 px-3 py-2 text-sm
+      text-slate-900 dark:text-slate-100 transition
+      focus:outline-none focus:ring-2 focus:ring-cyan-500/60;
+	}
+
+	/* Variante toujours-sombre : pour les surfaces sombres en permanence
+     (modal détail au fond slate-950) — évite un champ clair en thème clair. */
+	.field-dark {
+		@apply w-full rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-2 text-sm
+      text-slate-100 transition focus:outline-none focus:ring-2 focus:ring-cyan-500/60;
+	}
+
+	/* Surface "panneau" : verre calme (blur xl, pas 2xl), profondeur via liseré */
+	.panel {
+		@apply rounded-2xl border border-slate-200/70 dark:border-slate-800/80
+      bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl;
+	}
+
+	/* Ombres douces dirigées — remplacent les halos diffus 0_0_60px (look daté) */
+	.shadow-soft {
+		@apply shadow-[0_10px_34px_-16px_rgba(56,189,248,0.22)];
+	}
+	.shadow-soft-lg {
+		@apply shadow-[0_28px_70px_-30px_rgba(2,6,23,0.6)];
 	}
 }

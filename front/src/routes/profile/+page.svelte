@@ -77,13 +77,13 @@
 <div class="min-h-screen flex items-center justify-center py-10">
 	<div
 		class="w-full max-w-md mx-auto p-8
-           rounded-3xl bg-white/85 backdrop-blur-2xl
-           border border-white/70 shadow-[0_0_60px_rgba(56,189,248,0.3)]"
+           rounded-3xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg"
 	>
 		<div class="flex items-center justify-between mb-6">
 			<div class="flex flex-col gap-1">
-				<div class="text-xs uppercase tracking-[0.25em] text-slate-400">GotYeah Monitor</div>
-				<h1 class="text-2xl font-semibold text-slate-900">Profil</h1>
+				<div class="eyebrow">GotYeah Monitor</div>
+				<h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Profil</h1>
 			</div>
 			<div class="flex items-center gap-2">
 				<button type="button" class="btn btn-sm btn-muted" on:click={() => goto('/')}>
@@ -95,21 +95,16 @@
 
 		<form class="flex flex-col gap-4" on:submit|preventDefault={onSubmit}>
 			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600">Email</span>
-				<input
-					type="email"
-					class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-					bind:value={email}
-					required
-				/>
+				<span class="text-sm text-slate-600 dark:text-slate-300">Email</span>
+				<input type="email" class="field" bind:value={email} required />
 			</label>
 
 			<div class="flex flex-col gap-1">
 				<label class="flex flex-col gap-1">
-					<span class="text-sm text-slate-600">Nouveau mot de passe</span>
+					<span class="text-sm text-slate-600 dark:text-slate-300">Nouveau mot de passe</span>
 					<input
 						type="password"
-						class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+						class="field"
 						bind:value={newPassword}
 						placeholder="Laisser vide pour ne pas changer"
 					/>
@@ -120,31 +115,39 @@
 			{#if newPassword}
 				<div class="flex flex-col gap-1">
 					<label class="flex flex-col gap-1">
-						<span class="text-sm text-slate-600">Confirmer le mot de passe</span>
+						<span class="text-sm text-slate-600 dark:text-slate-300">Confirmer le mot de passe</span
+						>
 						<input
 							type="password"
-							class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60
-								{confirmPassword && !passwordsMatch ? 'border-rose-400 ring-2 ring-rose-200' : ''}"
+							class="field {confirmPassword && !passwordsMatch
+								? 'border-rose-400 ring-2 ring-rose-200 dark:border-rose-500/60 dark:ring-rose-500/20'
+								: ''}"
 							bind:value={confirmPassword}
 						/>
 					</label>
 					{#if confirmPassword && !passwordsMatch}
-						<p class="text-xs text-rose-500">Les mots de passe ne correspondent pas.</p>
+						<p class="text-xs text-rose-500 dark:text-rose-400">
+							Les mots de passe ne correspondent pas.
+						</p>
 					{:else if confirmPassword && passwordsMatch}
-						<p class="text-xs text-emerald-600">Les mots de passe correspondent.</p>
+						<p class="text-xs text-emerald-600 dark:text-emerald-400">
+							Les mots de passe correspondent.
+						</p>
 					{/if}
 				</div>
 			{/if}
 
 			{#if error}
-				<div class="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+				<div
+					class="rounded-xl px-3 py-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
+				>
 					{error}
 				</div>
 			{/if}
 
 			{#if success}
 				<div
-					class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2"
+					class="rounded-xl px-3 py-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30"
 				>
 					{success}
 				</div>

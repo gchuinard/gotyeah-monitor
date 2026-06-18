@@ -180,18 +180,16 @@
 <div class="min-h-screen flex items-start justify-center pt-10 pb-12">
 	<div
 		class="w-full max-w-5xl mx-auto
-           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
-           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg
            overflow-hidden"
 	>
 		<!-- Header -->
 		<div
-			class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80 dark:border-slate-800"
+			class="flex items-center justify-between px-8 pt-7 pb-5 border-b border-slate-200/80 dark:border-slate-800"
 		>
 			<div class="flex flex-col gap-1">
-				<div class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
-					GotYeah Monitor
-				</div>
+				<div class="eyebrow">GotYeah Monitor</div>
 				<div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
 					Back Office — Utilisateurs
 				</div>
@@ -214,18 +212,18 @@
 		<!-- Stats bar -->
 		{#if !loading && !error}
 			<div
-				class="flex gap-6 px-8 py-4 border-b border-slate-200/60 dark:border-slate-800/60 text-sm text-slate-500 dark:text-slate-400"
+				class="flex flex-wrap gap-6 px-8 py-4 border-b border-slate-200/60 dark:border-slate-800/60 text-sm text-slate-500 dark:text-slate-400"
 			>
 				<span
-					><strong class="text-slate-900 dark:text-slate-50">{users.length}</strong> utilisateurs</span
+					><strong class="text-slate-900 dark:text-slate-50 tabular-nums">{users.length}</strong> utilisateurs</span
 				>
 				<span
-					><strong class="text-slate-900 dark:text-slate-50"
+					><strong class="text-slate-900 dark:text-slate-50 tabular-nums"
 						>{users.reduce((acc, u) => acc + u.monitors.length, 0)}</strong
 					> moniteurs total</span
 				>
 				<span
-					><strong class="text-emerald-400"
+					><strong class="text-emerald-400 tabular-nums"
 						>{users.reduce(
 							(acc, u) => acc + u.monitors.filter((m) => m.status === 'up').length,
 							0
@@ -233,7 +231,7 @@
 					> up</span
 				>
 				<span
-					><strong class="text-rose-400"
+					><strong class="text-rose-400 tabular-nums"
 						>{users.reduce(
 							(acc, u) => acc + u.monitors.filter((m) => m.status === 'down').length,
 							0
@@ -256,7 +254,8 @@
 					{#each users as user (user.id)}
 						<div
 							class="rounded-2xl border border-slate-200/70 dark:border-slate-700/70
-                             bg-white/60 dark:bg-slate-800/60 overflow-hidden"
+                             bg-white/60 dark:bg-slate-800/60 overflow-hidden
+                             transition-all duration-300 hover:shadow-soft"
 						>
 							<!-- User row -->
 							<div
@@ -274,7 +273,7 @@
 									</span>
 									<div class="flex flex-col">
 										<span class="font-medium text-slate-900 dark:text-slate-100">{user.email}</span>
-										<span class="text-xs text-slate-400">
+										<span class="text-xs text-slate-400 tabular-nums">
 											Inscrit le {new Date(user.created_at).toLocaleDateString('fr-FR')}
 											· ID #{user.id}
 										</span>
@@ -282,7 +281,7 @@
 								</div>
 								<div class="flex items-center gap-4">
 									<div class="flex items-center gap-2 text-sm">
-										<span class="text-slate-500 dark:text-slate-400">
+										<span class="text-slate-500 dark:text-slate-400 tabular-nums">
 											{user.monitors.length} moniteur{user.monitors.length !== 1 ? 's' : ''}
 										</span>
 										{#if user.monitors.some((m) => m.status === 'down')}
@@ -293,13 +292,14 @@
 									</div>
 									<button
 										type="button"
-										class="text-xs text-rose-400 hover:text-rose-600 transition-colors px-2 py-1 rounded"
+										class="text-xs text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors px-2 py-1 rounded-md"
 										on:click|stopPropagation={() => askDeleteUser(user)}
 									>
 										Supprimer le compte
 									</button>
 									<svg
-										class="w-4 h-4 text-slate-400 transition-transform {expandedUserId === user.id
+										class="w-4 h-4 text-slate-400 transition-transform duration-300 {expandedUserId ===
+										user.id
 											? 'rotate-180'
 											: ''}"
 										fill="none"
@@ -320,22 +320,20 @@
 									{:else}
 										<table class="w-full text-sm">
 											<thead>
-												<tr
-													class="text-xs uppercase tracking-wider text-slate-400 border-b border-slate-200/50 dark:border-slate-700/50"
-												>
-													<th class="px-6 py-3 text-left">Nom</th>
-													<th class="px-4 py-3 text-left">URL</th>
-													<th class="px-4 py-3 text-left">Type</th>
-													<th class="px-4 py-3 text-left">Statut</th>
-													<th class="px-4 py-3 text-right">Latence</th>
-													<th class="px-4 py-3 text-right">Dernier check</th>
+												<tr class="eyebrow border-b border-slate-200/50 dark:border-slate-700/50">
+													<th class="px-6 py-3 text-left font-medium">Nom</th>
+													<th class="px-4 py-3 text-left font-medium">URL</th>
+													<th class="px-4 py-3 text-left font-medium">Type</th>
+													<th class="px-4 py-3 text-left font-medium">Statut</th>
+													<th class="px-4 py-3 text-right font-medium">Latence</th>
+													<th class="px-4 py-3 text-right font-medium">Dernier check</th>
 													<th class="px-4 py-3"></th>
 												</tr>
 											</thead>
 											<tbody>
 												{#each user.monitors as monitor (monitor.id)}
 													<tr
-														class="border-b border-slate-100/60 dark:border-slate-700/30 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 cursor-pointer"
+														class="border-b border-slate-100/60 dark:border-slate-700/30 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
 														on:click={() => openEdit(monitor, user.id)}
 													>
 														<td class="px-6 py-3 font-medium text-slate-800 dark:text-slate-200"
@@ -366,12 +364,14 @@
 																{monitor.status}
 															</span>
 														</td>
-														<td class="px-4 py-3 text-right text-slate-500 dark:text-slate-400">
+														<td
+															class="px-4 py-3 text-right text-slate-500 dark:text-slate-400 tabular-nums"
+														>
 															{monitor.last_latency_ms !== null
 																? `${monitor.last_latency_ms} ms`
 																: '—'}
 														</td>
-														<td class="px-4 py-3 text-right text-slate-400 text-xs">
+														<td class="px-4 py-3 text-right text-slate-400 text-xs tabular-nums">
 															{monitor.last_checked_at
 																? new Date(monitor.last_checked_at).toLocaleString('fr-FR')
 																: '—'}
@@ -379,7 +379,7 @@
 														<td class="px-4 py-3 text-right">
 															<button
 																type="button"
-																class="text-xs text-rose-400 hover:text-rose-600 transition-colors"
+																class="text-xs text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
 																on:click|stopPropagation={() => askDelete(monitor, user.email)}
 															>
 																Supprimer
@@ -410,7 +410,7 @@
 		<div
 			class="w-full max-w-md mx-4 rounded-2xl bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_40px_rgba(0,0,0,0.3)] p-6 flex flex-col gap-5"
+                   shadow-soft-lg p-6 flex flex-col gap-5"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -422,27 +422,16 @@
 			<div class="flex flex-col gap-3">
 				<label class="flex flex-col gap-1">
 					<span class="text-xs text-slate-500 dark:text-slate-400">Nom</span>
-					<input
-						type="text"
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						bind:value={editModal.name}
-					/>
+					<input type="text" class="field" bind:value={editModal.name} />
 				</label>
 				<label class="flex flex-col gap-1">
 					<span class="text-xs text-slate-500 dark:text-slate-400">URL</span>
-					<input
-						type="url"
-						class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-						bind:value={editModal.url}
-					/>
+					<input type="url" class="field" bind:value={editModal.url} />
 				</label>
 				<div class="flex gap-3">
 					<label class="flex flex-col gap-1 flex-1">
 						<span class="text-xs text-slate-500 dark:text-slate-400">Type</span>
-						<select
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-							bind:value={editModal.type}
-						>
+						<select class="field" bind:value={editModal.type}>
 							<option value="http">HTTP</option>
 							<option value="ping">Ping</option>
 							<option value="port">Port</option>
@@ -452,7 +441,7 @@
 						<span class="text-xs text-slate-500 dark:text-slate-400">Code attendu</span>
 						<input
 							type="number"
-							class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+							class="field tabular-nums"
 							bind:value={editModal.expected_status_code}
 						/>
 					</label>
@@ -492,7 +481,7 @@
 		<div
 			class="w-full max-w-sm mx-4 rounded-2xl bg-white dark:bg-slate-900
                    border border-slate-200 dark:border-slate-700
-                   shadow-[0_0_40px_rgba(0,0,0,0.3)] p-6 flex flex-col gap-5"
+                   shadow-soft-lg p-6 flex flex-col gap-5"
 			on:click|stopPropagation
 			role="dialog"
 			aria-modal="true"
@@ -549,7 +538,10 @@
 					</span>
 					<input
 						type="text"
-						class="rounded-lg border border-rose-300 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+						class="w-full rounded-xl border border-rose-300 dark:border-rose-500/40
+                           bg-slate-50 dark:bg-slate-800/80 px-3 py-2 text-sm
+                           text-slate-900 dark:text-slate-100 transition
+                           focus:outline-none focus:ring-2 focus:ring-rose-400/60"
 						bind:value={confirmText}
 						placeholder={confirmModal.kind === 'monitor' ? confirmModal.monitorName : 'supprimer'}
 					/>
@@ -577,7 +569,7 @@
 				</button>
 				<button
 					type="button"
-					class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white border-transparent disabled:opacity-50"
+					class="btn btn-sm btn-danger disabled:opacity-50"
 					on:click={confirmDelete}
 					disabled={deleting ||
 						(confirmModal.kind === 'monitor'

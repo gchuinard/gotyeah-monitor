@@ -97,9 +97,8 @@
 	on:click={onToggleDetails}
 	on:keydown={(e) => e.key === 'Enter' && onToggleDetails()}
 	class={`relative rounded-3xl border cursor-pointer select-none
-		bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl
-		shadow-[0_0_35px_rgba(56,189,248,0.28)] dark:shadow-[0_0_45px_rgba(56,189,248,0.4)]
-		hover:shadow-[0_0_55px_rgba(56,189,248,0.45)] hover:-translate-y-0.5 hover:scale-[1.01]
+		bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl shadow-soft
+		hover:shadow-[0_16px_44px_-18px_rgba(56,189,248,0.32)] hover:-translate-y-0.5
 		transition-all duration-300
 		${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}
 		${animationClass}
@@ -118,16 +117,16 @@
 				<div class="flex items-center gap-2">
 					<h2 class="font-semibold text-sm text-slate-900 dark:text-slate-50 truncate">{name}</h2>
 					{#if inMaintenance}<span
-							class="px-1.5 py-0.5 text-[10px] rounded bg-orange-500/20 text-orange-300 border border-orange-500/30 shrink-0"
+							class="px-1.5 py-0.5 text-[10px] rounded-md bg-orange-500/20 text-orange-300 border border-orange-500/30 shrink-0"
 							>🔧</span
 						>{/if}
 					<span
-						class="px-1.5 py-0.5 text-[10px] rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0"
+						class="px-1.5 py-0.5 text-[10px] rounded-md bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0"
 						>{type}</span
 					>
 				</div>
 				<div class="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-					<span class={`font-medium ${latencyColor(latency)}`}
+					<span class={`font-medium tabular-nums ${latencyColor(latency)}`}
 						>{latency !== null ? `${latency} ms` : 'N/A'}</span
 					>
 					<span class="truncate text-cyan-600">{url}</span>
@@ -141,12 +140,12 @@
 				<span class="text-xl">{statusIcon[status]}</span>
 				<h2 class="font-semibold text-lg text-slate-900 dark:text-slate-50">{name}</h2>
 				{#if inMaintenance}<span
-						class="px-2 py-0.5 text-[10px] rounded bg-orange-500/20 text-orange-300 border border-orange-500/30"
+						class="px-2 py-0.5 text-[10px] rounded-md bg-orange-500/20 text-orange-300 border border-orange-500/30"
 						>🔧 maintenance</span
 					>{/if}
 			</div>
 			<span
-				class="px-2 py-1 text-xs rounded bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
+				class="px-2 py-1 text-xs rounded-md bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
 				>{type}</span
 			>
 		</div>
@@ -156,7 +155,7 @@
 				{status === 'up' ? 'Online' : status === 'down' ? 'Offline' : 'Checking...'}
 			</span>
 			<span class="text-slate-500 text-xs">·</span>
-			<span class={`font-medium ${latencyColor(latency)}`}>
+			<span class={`font-medium tabular-nums ${latencyColor(latency)}`}>
 				{latency !== null ? `${latency} ms` : 'N/A'}
 			</span>
 		</div>
@@ -195,20 +194,26 @@
 
 	{#if uptime24h !== null || uptime7d !== null || uptime30d !== null || uptime90d !== null}
 		<div class="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-			<span class="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500"
-				>Uptime</span
-			>
+			<span class="eyebrow">Uptime</span>
 			{#if uptime24h !== null}
-				<span>24h <strong class={uptimeColor(uptime24h)}>{uptime24h}%</strong></span>
+				<span class="tabular-nums"
+					>24h <strong class={uptimeColor(uptime24h)}>{uptime24h}%</strong></span
+				>
 			{/if}
 			{#if uptime7d !== null}
-				<span>7j <strong class={uptimeColor(uptime7d)}>{uptime7d}%</strong></span>
+				<span class="tabular-nums"
+					>7j <strong class={uptimeColor(uptime7d)}>{uptime7d}%</strong></span
+				>
 			{/if}
 			{#if uptime30d !== null}
-				<span>30j <strong class={uptimeColor(uptime30d)}>{uptime30d}%</strong></span>
+				<span class="tabular-nums"
+					>30j <strong class={uptimeColor(uptime30d)}>{uptime30d}%</strong></span
+				>
 			{/if}
 			{#if uptime90d !== null}
-				<span>90j <strong class={uptimeColor(uptime90d)}>{uptime90d}%</strong></span>
+				<span class="tabular-nums"
+					>90j <strong class={uptimeColor(uptime90d)}>{uptime90d}%</strong></span
+				>
 			{/if}
 		</div>
 	{/if}

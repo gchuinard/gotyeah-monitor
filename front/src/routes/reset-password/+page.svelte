@@ -53,17 +53,19 @@
 <div class="min-h-screen flex items-center justify-center py-10">
 	<div
 		class="w-full max-w-md mx-auto p-8
-           rounded-3xl bg-white/85 backdrop-blur-2xl
-           border border-white/70 shadow-[0_0_60px_rgba(56,189,248,0.3)]"
+           rounded-3xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg"
 	>
 		<div class="flex flex-col gap-1 mb-6">
-			<div class="text-xs uppercase tracking-[0.25em] text-slate-400">GotYeah Monitor</div>
-			<h1 class="text-2xl font-semibold text-slate-900">Nouveau mot de passe</h1>
+			<div class="eyebrow">GotYeah Monitor</div>
+			<h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+				Nouveau mot de passe
+			</h1>
 		</div>
 
 		{#if invalidLink}
 			<div
-				class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4"
+				class="flex items-start gap-2 rounded-xl px-3 py-2 mb-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
 			>
 				<svg
 					class="w-4 h-4 shrink-0 mt-0.5"
@@ -89,7 +91,7 @@
 			</button>
 		{:else if success}
 			<div
-				class="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2"
+				class="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30"
 			>
 				<svg
 					class="w-4 h-4 shrink-0"
@@ -106,38 +108,39 @@
 			<form class="flex flex-col gap-4" on:submit|preventDefault={onSubmit}>
 				<div class="flex flex-col gap-1">
 					<label class="flex flex-col gap-1">
-						<span class="text-sm text-slate-600">Nouveau mot de passe</span>
-						<input
-							type="password"
-							class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-							bind:value={newPassword}
-							required
-						/>
+						<span class="text-sm text-slate-600 dark:text-slate-300">Nouveau mot de passe</span>
+						<input type="password" class="field" bind:value={newPassword} required />
 					</label>
 					<PasswordStrength password={newPassword} bind:valid={passwordValid} />
 				</div>
 
 				<div class="flex flex-col gap-1">
 					<label class="flex flex-col gap-1">
-						<span class="text-sm text-slate-600">Confirmer le mot de passe</span>
+						<span class="text-sm text-slate-600 dark:text-slate-300">Confirmer le mot de passe</span
+						>
 						<input
 							type="password"
-							class="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-400/60
-								{confirmPassword && !passwordsMatch ? 'border-rose-400 ring-2 ring-rose-200' : ''}"
+							class="field {confirmPassword && !passwordsMatch
+								? 'border-rose-400 ring-2 ring-rose-200 dark:border-rose-500/60 dark:ring-rose-500/20'
+								: ''}"
 							bind:value={confirmPassword}
 							required
 						/>
 					</label>
 					{#if confirmPassword && !passwordsMatch}
-						<p class="text-xs text-rose-500">Les mots de passe ne correspondent pas.</p>
+						<p class="text-xs text-rose-500 dark:text-rose-400">
+							Les mots de passe ne correspondent pas.
+						</p>
 					{:else if confirmPassword && passwordsMatch}
-						<p class="text-xs text-emerald-600">Les mots de passe correspondent.</p>
+						<p class="text-xs text-emerald-600 dark:text-emerald-400">
+							Les mots de passe correspondent.
+						</p>
 					{/if}
 				</div>
 
 				{#if error}
 					<div
-						class="flex items-start gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2"
+						class="flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
 					>
 						<svg
 							class="w-4 h-4 shrink-0 mt-0.5"

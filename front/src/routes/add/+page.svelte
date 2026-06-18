@@ -38,17 +38,15 @@
 <div class="min-h-screen flex items-start justify-center pt-10 pb-12">
 	<div
 		class="w-full max-w-xl mx-auto
-           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl
-           border border-white/70 dark:border-slate-800 shadow-[0_0_60px_rgba(56,189,248,0.28)]
+           rounded-3xl bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl
+           border border-white/70 dark:border-slate-800 shadow-soft-lg
            overflow-hidden"
 	>
 		<div
-			class="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-200/80 dark:border-slate-800"
+			class="flex items-center justify-between px-8 pt-7 pb-5 border-b border-slate-200/80 dark:border-slate-800"
 		>
 			<div class="flex flex-col gap-1">
-				<div class="text-xs uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500">
-					GotYeah Monitor
-				</div>
+				<div class="eyebrow">GotYeah Monitor</div>
 				<h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">Ajouter un monitor</h1>
 			</div>
 			<button type="button" class="btn btn-sm btn-secondary" on:click={() => goto('/')}>
@@ -56,42 +54,29 @@
 			</button>
 		</div>
 
-		<div class="px-4 pb-6 pt-4">
+		<div class="px-6 pb-6 pt-5">
 			<form
-				class="rounded-3xl border bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl
-               shadow-[0_0_35px_rgba(56,189,248,0.28)] dark:shadow-[0_0_45px_rgba(56,189,248,0.4)]
+				class="rounded-2xl border border-slate-200/70 dark:border-slate-800/80
+               bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl shadow-soft
                flex flex-col gap-4 p-6"
 				on:submit|preventDefault={onSubmit}
 			>
 				<label class="flex flex-col gap-1">
-					<span class="text-sm text-slate-600 dark:text-slate-200">Nom</span>
-					<input
-						class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-						bind:value={name}
-						placeholder="Ex: Backend API"
-						required
-					/>
+					<span class="text-sm text-slate-600 dark:text-slate-300">Nom</span>
+					<input class="field" bind:value={name} placeholder="Ex: Backend API" required />
 				</label>
 
 				<label class="flex flex-col gap-1">
-					<span class="text-sm text-slate-600 dark:text-slate-200">URL</span>
-					<input
-						class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-						bind:value={url}
-						placeholder="https://example.com/health"
-						required
-					/>
+					<span class="text-sm text-slate-600 dark:text-slate-300">URL</span>
+					<input class="field" bind:value={url} placeholder="https://example.com/health" required />
 					<span class="text-xs text-slate-400 dark:text-slate-500"
 						>Doit être une URL valide (http/https).</span
 					>
 				</label>
 
 				<label class="flex flex-col gap-1">
-					<span class="text-sm text-slate-600 dark:text-slate-200">Type</span>
-					<select
-						class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-						bind:value={type}
-					>
+					<span class="text-sm text-slate-600 dark:text-slate-300">Type</span>
+					<select class="field" bind:value={type}>
 						<option value="http">HTTP</option>
 						<option value="ping">Ping</option>
 						<option value="port">Port</option>
@@ -99,12 +84,12 @@
 				</label>
 
 				<label class="flex flex-col gap-1">
-					<span class="text-sm text-slate-600 dark:text-slate-200">Code HTTP attendu</span>
+					<span class="text-sm text-slate-600 dark:text-slate-300">Code HTTP attendu</span>
 					<input
 						type="number"
 						min="100"
 						max="599"
-						class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
+						class="field tabular-nums"
 						bind:value={expectedStatusCode}
 					/>
 					<span class="text-xs text-slate-400 dark:text-slate-500">Par défaut 200 (OK).</span>

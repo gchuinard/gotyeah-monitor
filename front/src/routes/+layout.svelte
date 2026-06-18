@@ -9,9 +9,9 @@
 >
 	<div
 		class="pointer-events-none absolute inset-[-20%]
-           bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.22),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(148,163,184,0.16),_transparent_55%)]
+           bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.16),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(148,163,184,0.10),_transparent_55%)]
            dark:inset-[-10%]
-           dark:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.35),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(168,85,247,0.35),_transparent_55%)]"
+           dark:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.20),_transparent_58%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.07),_transparent_55%)]"
 	></div>
 
 	<div class="relative">

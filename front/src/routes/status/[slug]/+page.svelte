@@ -83,10 +83,10 @@
 		{#if monitors.length === 0}
 			<p class="text-slate-400 text-sm">Aucun service public pour le moment.</p>
 		{:else}
-			<div class="flex flex-col gap-2">
+			<div class="flex flex-col gap-2.5">
 				{#each monitors as m (m.name)}
 					<div
-						class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800"
+						class="flex items-center gap-3 rounded-xl px-4 py-3 bg-slate-900/60 border border-slate-800 shadow-soft"
 					>
 						<span class="text-lg"
 							>{m.status === 'up' ? '🟢' : m.status === 'down' ? '🔴' : '⚪'}</span
@@ -94,11 +94,11 @@
 						<span class="font-medium">{m.name}</span>
 						{#if m.has_open_incident}
 							<span
-								class="text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30"
+								class="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30"
 								>incident</span
 							>
 						{/if}
-						<span class="ml-auto text-xs flex items-center gap-3">
+						<span class="ml-auto text-xs flex items-center gap-3 tabular-nums">
 							{#if m.uptime_24h !== null}
 								<span class="text-slate-400"
 									>24h <strong class={uptimeColor(m.uptime_24h)}>{m.uptime_24h}%</strong></span

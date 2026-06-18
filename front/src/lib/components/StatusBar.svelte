@@ -217,7 +217,7 @@
 		{@const left = Math.max(0, tooltip.x - 56)}
 		<div
 			class="absolute z-10 pointer-events-none px-2.5 py-1.5 rounded-lg
-				   bg-slate-800 border border-slate-700 shadow-lg text-xs leading-tight
+				   bg-slate-800 border border-slate-700 shadow-soft-lg text-xs leading-tight
 				   -translate-y-full"
 			style="top: {tooltip.y - 6}px; left: {left}px; min-width: 112px;"
 		>
