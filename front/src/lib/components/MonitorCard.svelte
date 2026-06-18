@@ -161,16 +161,35 @@
 			</span>
 		</div>
 
-		<div class="text-xs text-slate-500 dark:text-slate-400">
+		<div class="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
 			<a
 				href={url}
 				target="_blank"
 				rel="noreferrer"
-				class="truncate text-cyan-600 hover:text-cyan-500 hover:underline block"
+				class="inline-flex items-center gap-1 max-w-full min-w-0 self-start rounded-md
+					border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5
+					text-cyan-600 dark:text-cyan-400
+					hover:bg-cyan-500/20 hover:border-cyan-500/40 hover:underline transition-colors"
 				title={url}
-				on:click|stopPropagation>{url}</a
+				on:click|stopPropagation
 			>
-			<span class="mt-0.5 block">{formatRelative(lastCheckedAt)}</span>
+				<svg
+					class="h-3 w-3 shrink-0"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					viewBox="0 0 24 24"
+					aria-hidden="true"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+					/>
+				</svg>
+				<span class="truncate">{url}</span>
+			</a>
+			<span>{formatRelative(lastCheckedAt)}</span>
 		</div>
 	{/if}
 

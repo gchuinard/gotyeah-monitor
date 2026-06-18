@@ -850,9 +850,9 @@
 			</div>
 			{#if $groups.length === 0}
 				<div
-					class={viewMode === 'grid'
+					class={(viewMode === 'grid'
 						? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
-						: 'flex flex-col gap-4' + ' p-8'}
+						: 'flex flex-col gap-4') + ' p-8'}
 				>
 					{#each filteredMonitors as m (m.id)}
 						<MonitorCard
@@ -881,9 +881,9 @@
 							</button>
 							{#if !$groupCollapse[section.key]}
 								<div
-									class={viewMode === 'grid'
+									class={(viewMode === 'grid'
 										? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
-										: 'flex flex-col gap-4' + ' pb-4'}
+										: 'flex flex-col gap-4') + ' pb-4'}
 								>
 									{#each section.items as m (m.id)}
 										<MonitorCard
