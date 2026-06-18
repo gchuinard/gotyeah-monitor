@@ -511,6 +511,134 @@
 				<StatusBar history={monitor.history} monitorId={monitor.id} />
 			</div>
 
+			<!-- Graphiques (pleine largeur) -->
+			<div class="px-6">
+				<div class="flex flex-col gap-4">
+					<!-- Tabs -->
+					<div class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
+						<button
+							class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+							${mode === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+							on:click={() => (mode = 0)}
+						>
+							<svg
+								class="w-3.5 h-3.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								viewBox="0 0 24 24"
+							>
+								<polyline
+									points="22 12 18 12 15 21 9 3 6 12 2 12"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
+							</svg>
+							Latence
+						</button>
+						<button
+							class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+							${mode === 1 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+							on:click={() => (mode = 1)}
+						>
+							<svg
+								class="w-3.5 h-3.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								viewBox="0 0 24 24"
+							>
+								<rect x="3" y="3" width="7" height="7" rx="1" /><rect
+									x="14"
+									y="3"
+									width="7"
+									height="7"
+									rx="1"
+								/><rect x="3" y="14" width="7" height="7" rx="1" /><rect
+									x="14"
+									y="14"
+									width="7"
+									height="7"
+									rx="1"
+								/>
+							</svg>
+							Les deux
+						</button>
+						<button
+							class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
+							${mode === 2 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+							on:click={() => (mode = 2)}
+						>
+							<svg
+								class="w-3.5 h-3.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								viewBox="0 0 24 24"
+							>
+								<line x1="8" y1="6" x2="21" y2="6" stroke-linecap="round" /><line
+									x1="8"
+									y1="12"
+									x2="21"
+									y2="12"
+									stroke-linecap="round"
+								/><line x1="8" y1="18" x2="21" y2="18" stroke-linecap="round" /><circle
+									cx="3"
+									cy="6"
+									r="1.5"
+									fill="currentColor"
+								/><circle cx="3" cy="12" r="1.5" fill="currentColor" /><circle
+									cx="3"
+									cy="18"
+									r="1.5"
+									fill="currentColor"
+								/>
+							</svg>
+							Historique
+						</button>
+					</div>
+
+					{#if mode === 0 || mode === 1}
+						<Sparkline
+							values={latencyValues}
+							timestamps={monitor.history
+								.filter((c) => c.latency_ms !== null)
+								.map((c) => c.checked_at)}
+							height={160}
+						/>
+					{/if}
+
+					{#if mode === 1 || mode === 2}
+						<div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
+							{#each [...monitor.history].reverse() as c (c.id)}
+								<div
+									class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+								>
+									{#if c.status === 'up'}
+										<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+									{:else}
+										<span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
+									{/if}
+									<span
+										class={`font-mono font-medium tabular-nums ${c.latency_ms !== null ? latencyColor(c.latency_ms) : 'text-gray-500'}`}
+									>
+										{c.latency_ms !== null ? `${c.latency_ms} ms` : '—'}
+									</span>
+									<span class="ml-auto text-slate-500 font-mono text-[11px] tabular-nums">
+										{toUtcDate(c.checked_at).toLocaleString('fr-FR', {
+											day: '2-digit',
+											month: '2-digit',
+											hour: '2-digit',
+											minute: '2-digit'
+										})}
+									</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</div>
+
 			<!-- Corps : 2 colonnes responsive -->
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
 				<!-- ── Colonne gauche ──────────────────────────────────────────── -->
@@ -577,34 +705,6 @@
 						</div>
 					</div>
 
-					<!-- SSL -->
-					{#if monitor.sslExpiryAt !== null}
-						{@const ssl = sslStatus(monitor.sslExpiryAt)}
-						<div
-							class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex items-center justify-between gap-2 text-xs"
-						>
-							<span class="text-slate-400 flex items-center gap-1.5">
-								<svg
-									class="w-3.5 h-3.5"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2.5"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-									/>
-								</svg>
-								Certificat SSL
-							</span>
-							<span class={`font-medium tabular-nums ${ssl.color}`}>
-								{ssl.label} · exp. {toUtcDate(monitor.sslExpiryAt).toLocaleDateString('fr-FR')}
-							</span>
-						</div>
-					{/if}
-
 					<!-- Journal d'incidents -->
 					<div class="flex flex-col gap-2">
 						<div class="flex items-center justify-between">
@@ -668,6 +768,37 @@
 							</div>
 						{/if}
 					</div>
+				</div>
+
+				<!-- ── Colonne droite ──────────────────────────────────────────── -->
+				<div class="flex flex-col gap-4">
+					<!-- SSL -->
+					{#if monitor.sslExpiryAt !== null}
+						{@const ssl = sslStatus(monitor.sslExpiryAt)}
+						<div
+							class="rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 flex items-center justify-between gap-2 text-xs"
+						>
+							<span class="text-slate-400 flex items-center gap-1.5">
+								<svg
+									class="w-3.5 h-3.5"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.5"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+									/>
+								</svg>
+								Certificat SSL
+							</span>
+							<span class={`font-medium tabular-nums ${ssl.color}`}>
+								{ssl.label} · exp. {toUtcDate(monitor.sslExpiryAt).toLocaleDateString('fr-FR')}
+							</span>
+						</div>
+					{/if}
 
 					<!-- Maintenance planifiée -->
 					<div class="flex flex-col gap-2">
@@ -712,135 +843,6 @@
 							disabled={mwSubmitting || !mwStart || !mwEnd}
 							>{mwSubmitting ? '...' : 'Planifier'}</button
 						>
-					</div>
-				</div>
-
-				<!-- ── Colonne droite ──────────────────────────────────────────── -->
-				<div class="flex flex-col gap-4">
-					<!-- Graphiques -->
-					<div class="flex flex-col gap-4">
-						<!-- Tabs -->
-						<div class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
-							<button
-								class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-								${mode === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-								on:click={() => (mode = 0)}
-							>
-								<svg
-									class="w-3.5 h-3.5"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									viewBox="0 0 24 24"
-								>
-									<polyline
-										points="22 12 18 12 15 21 9 3 6 12 2 12"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									/>
-								</svg>
-								Latence
-							</button>
-							<button
-								class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-								${mode === 1 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-								on:click={() => (mode = 1)}
-							>
-								<svg
-									class="w-3.5 h-3.5"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									viewBox="0 0 24 24"
-								>
-									<rect x="3" y="3" width="7" height="7" rx="1" /><rect
-										x="14"
-										y="3"
-										width="7"
-										height="7"
-										rx="1"
-									/><rect x="3" y="14" width="7" height="7" rx="1" /><rect
-										x="14"
-										y="14"
-										width="7"
-										height="7"
-										rx="1"
-									/>
-								</svg>
-								Les deux
-							</button>
-							<button
-								class={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200
-								${mode === 2 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-								on:click={() => (mode = 2)}
-							>
-								<svg
-									class="w-3.5 h-3.5"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									viewBox="0 0 24 24"
-								>
-									<line x1="8" y1="6" x2="21" y2="6" stroke-linecap="round" /><line
-										x1="8"
-										y1="12"
-										x2="21"
-										y2="12"
-										stroke-linecap="round"
-									/><line x1="8" y1="18" x2="21" y2="18" stroke-linecap="round" /><circle
-										cx="3"
-										cy="6"
-										r="1.5"
-										fill="currentColor"
-									/><circle cx="3" cy="12" r="1.5" fill="currentColor" /><circle
-										cx="3"
-										cy="18"
-										r="1.5"
-										fill="currentColor"
-									/>
-								</svg>
-								Historique
-							</button>
-						</div>
-
-						{#if mode === 0 || mode === 1}
-							<Sparkline
-								values={latencyValues}
-								timestamps={monitor.history
-									.filter((c) => c.latency_ms !== null)
-									.map((c) => c.checked_at)}
-								height={160}
-							/>
-						{/if}
-
-						{#if mode === 1 || mode === 2}
-							<div class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
-								{#each [...monitor.history].reverse() as c (c.id)}
-									<div
-										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
-									>
-										{#if c.status === 'up'}
-											<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-										{:else}
-											<span class="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
-										{/if}
-										<span
-											class={`font-mono font-medium tabular-nums ${c.latency_ms !== null ? latencyColor(c.latency_ms) : 'text-gray-500'}`}
-										>
-											{c.latency_ms !== null ? `${c.latency_ms} ms` : '—'}
-										</span>
-										<span class="ml-auto text-slate-500 font-mono text-[11px] tabular-nums">
-											{toUtcDate(c.checked_at).toLocaleString('fr-FR', {
-												day: '2-digit',
-												month: '2-digit',
-												hour: '2-digit',
-												minute: '2-digit'
-											})}
-										</span>
-									</div>
-								{/each}
-							</div>
-						{/if}
 					</div>
 				</div>
 			</div>
