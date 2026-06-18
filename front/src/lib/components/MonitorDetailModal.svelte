@@ -718,7 +718,7 @@
 				<!-- ── Colonne droite ──────────────────────────────────────────── -->
 				<div class="flex flex-col gap-4">
 					<!-- Graphiques -->
-					<div class="flex flex-col gap-4">
+					<div class="flex flex-col gap-4 lg:flex-1 lg:min-h-0">
 						<!-- Tabs -->
 						<div class="flex gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
 							<button
@@ -814,7 +814,9 @@
 						{/if}
 
 						{#if mode === 1 || mode === 2}
-							<div class="flex flex-col gap-1 max-h-64 overflow-y-auto pr-1">
+							<div
+								class="flex flex-col gap-1 max-h-64 overflow-y-auto pr-1 lg:max-h-none lg:flex-1 lg:min-h-0"
+							>
 								{#each [...monitor.history].reverse() as c (c.id)}
 									<div
 										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
