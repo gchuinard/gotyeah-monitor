@@ -878,6 +878,19 @@
 								<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
 								{section.name}
 								<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
+								{#if $groupCollapse[section.key]}
+									<span class="flex items-center gap-1 ml-1 flex-wrap">
+										{#each section.items as m (m.id)}
+											<span
+												class="h-2 w-2 rounded-full shrink-0 {m.status === 'up'
+													? 'bg-emerald-400'
+													: m.status === 'down'
+														? 'bg-rose-400'
+														: 'bg-sky-300'}"
+											></span>
+										{/each}
+									</span>
+								{/if}
 							</button>
 							{#if section.groupId !== null}
 								<button
