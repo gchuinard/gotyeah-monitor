@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { monitors, type CheckEntry } from '$lib/stores/monitors';
+	import { monitors, type CheckEntry, type MonitorCardData } from '$lib/stores/monitors';
 	import { auth, clearAuth, type AuthState } from '$lib/stores/auth';
 	import { parseApiError, parseNetworkError } from '$lib/utils/errors';
 	import { apiFetch } from '$lib/utils/api';
@@ -11,6 +11,15 @@
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 	import { onMount } from 'svelte';
 	import { goto, preloadCode } from '$app/navigation';
+	import {
+		sortMode,
+		groupOrder,
+		monitorOrder,
+		applyManualOrder,
+		SORT_OPTIONS,
+		type SortMode
+	} from '$lib/stores/sortPrefs';
+	import { dndzone } from 'svelte-dnd-action';
 
 	type MonitorFromApi = {
 		id: number;
@@ -211,6 +220,103 @@
 			)
 		}
 	].filter((sct) => sct.items.length > 0);
+
+	// ── Tri & glisser-déposer ─────────────────────────────────────────────────
+	const FLIP_MS = 160;
+	let dragging = false;
+	type Card = MonitorCardData;
+	type Section = { key: string; id: number; groupId: number | null; name: string; items: Card[] };
+
+	function statusRank(s: string): number {
+		return s === 'down' ? 0 : s === 'checking' ? 1 : 2;
+	}
+	function sortCards(items: Card[], mode: SortMode, sectionKey: string): Card[] {
+		if (mode === 'manual') return applyManualOrder(items, $monitorOrder[sectionKey] ?? []);
+		const arr = [...items];
+		if (mode === 'name') arr.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+		else if (mode === 'status')
+			arr.sort(
+				(a, b) => statusRank(a.status) - statusRank(b.status) || a.name.localeCompare(b.name, 'fr')
+			);
+		else if (mode === 'latency') arr.sort((a, b) => (b.latency ?? -1) - (a.latency ?? -1));
+		else if (mode === 'uptime') arr.sort((a, b) => (a.uptime24h ?? 101) - (b.uptime24h ?? 101));
+		return arr;
+	}
+	function groupRank(items: Card[], mode: SortMode): number {
+		if (!items.length) return mode === 'status' ? 2 : mode === 'uptime' ? 101 : 0;
+		if (mode === 'status') return Math.min(...items.map((m) => statusRank(m.status)));
+		if (mode === 'latency') return -Math.max(...items.map((m) => m.latency ?? -1));
+		if (mode === 'uptime') return Math.min(...items.map((m) => m.uptime24h ?? 101));
+		return 0;
+	}
+
+	// Vues mutables (re-synchronisées sauf pendant un glisser, pour ne pas casser le D&D)
+	let flatCards: Card[] = [];
+	let realSections: Section[] = [];
+	let ungroupedSection: Section | null = null;
+
+	$: if (!dragging) flatCards = sortCards(filteredMonitors, $sortMode, 'all');
+	$: if (!dragging) {
+		const real: Section[] = groupSections
+			.filter((s) => s.groupId !== null)
+			.map((s) => ({ ...s, id: s.groupId as number, items: sortCards(s.items, $sortMode, s.key) }));
+		if ($sortMode === 'manual') {
+			real.sort((a, b) => {
+				const pa = $groupOrder.indexOf(a.id);
+				const pb = $groupOrder.indexOf(b.id);
+				return (pa === -1 ? 1e9 : pa) - (pb === -1 ? 1e9 : pb);
+			});
+		} else {
+			real.sort(
+				(a, b) =>
+					groupRank(a.items, $sortMode) - groupRank(b.items, $sortMode) ||
+					a.name.localeCompare(b.name, 'fr')
+			);
+		}
+		realSections = real;
+		const ung = groupSections.find((s) => s.groupId === null);
+		ungroupedSection = ung
+			? { ...ung, id: -1, items: sortCards(ung.items, $sortMode, ung.key) }
+			: null;
+	}
+
+	$: dragDisabled = $sortMode !== 'manual';
+
+	function persistCardOrder(key: string, items: Card[]) {
+		monitorOrder.update((m) => ({ ...m, [key]: items.map((c) => c.id) }));
+	}
+	function setSectionItems(key: string, items: Card[]) {
+		if (ungroupedSection && ungroupedSection.key === key)
+			ungroupedSection = { ...ungroupedSection, items };
+		else realSections = realSections.map((s) => (s.key === key ? { ...s, items } : s));
+	}
+	function flatConsider(e: CustomEvent) {
+		dragging = true;
+		flatCards = e.detail.items;
+	}
+	function flatFinalize(e: CustomEvent) {
+		flatCards = e.detail.items;
+		persistCardOrder('all', flatCards);
+		dragging = false;
+	}
+	function sectionConsider(key: string, e: CustomEvent) {
+		dragging = true;
+		setSectionItems(key, e.detail.items);
+	}
+	function sectionFinalize(key: string, e: CustomEvent) {
+		setSectionItems(key, e.detail.items);
+		persistCardOrder(key, e.detail.items);
+		dragging = false;
+	}
+	function groupsConsider(e: CustomEvent) {
+		dragging = true;
+		realSections = e.detail.items;
+	}
+	function groupsFinalize(e: CustomEvent) {
+		realSections = e.detail.items;
+		groupOrder.set(realSections.map((s) => s.id));
+		dragging = false;
+	}
 
 	// Utilise la réactivité Svelte pour suivre le store auth
 	$: authState = $auth;
@@ -768,6 +874,16 @@
 						placeholder="Rechercher un moniteur…"
 						class="field flex-1"
 					/>
+					<select
+						bind:value={$sortMode}
+						class="field w-auto shrink-0"
+						title="Trier les moniteurs"
+						aria-label="Trier les moniteurs"
+					>
+						{#each SORT_OPTIONS as opt (opt.value)}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</select>
 					<button
 						type="button"
 						class="btn btn-sm btn-secondary whitespace-nowrap"
@@ -852,8 +968,11 @@
 				class={(viewMode === 'grid'
 					? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
 					: 'flex flex-col gap-4') + ' p-8'}
+				use:dndzone={{ items: flatCards, dragDisabled, flipDurationMs: FLIP_MS, type: 'cards' }}
+				on:consider={flatConsider}
+				on:finalize={flatFinalize}
 			>
-				{#each filteredMonitors as m (m.id)}
+				{#each flatCards as m (m.id)}
 					<MonitorCard
 						{...m}
 						showDetails={openCardId === m.id}
@@ -867,7 +986,93 @@
 			</div>
 		{:else}
 			<div class="flex flex-col gap-2 p-8">
-				{#each groupSections as section (section.key)}
+				<div
+					class="flex flex-col gap-2"
+					use:dndzone={{
+						items: realSections,
+						dragDisabled,
+						flipDurationMs: FLIP_MS,
+						type: 'groups'
+					}}
+					on:consider={groupsConsider}
+					on:finalize={groupsFinalize}
+				>
+					{#each realSections as section (section.id)}
+						<div>
+							<div class="flex items-center gap-1">
+								<button
+									type="button"
+									class="flex items-center gap-2 flex-1 text-left py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+									on:click={() => toggleGroupCollapse(section.key)}
+								>
+									<span class="text-slate-400">{$groupCollapse[section.key] ? '▸' : '▾'}</span>
+									{section.name}
+									<span class="text-xs font-normal text-slate-400">({section.items.length})</span>
+									{#if $groupCollapse[section.key]}
+										<span class="flex items-center gap-1 ml-1 flex-wrap">
+											{#each section.items as m (m.id)}
+												<span
+													class="h-2 w-2 rounded-full shrink-0 {m.status === 'up'
+														? 'bg-emerald-400'
+														: m.status === 'down'
+															? 'bg-rose-400'
+															: 'bg-sky-300'}"
+												></span>
+											{/each}
+										</span>
+									{/if}
+								</button>
+								{#if section.groupId !== null}
+									<button
+										type="button"
+										class="h-6 w-6 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-500 hover:bg-cyan-500/10 transition-colors shrink-0"
+										title={`Ajouter un moniteur dans « ${section.name} »`}
+										on:click={() => openAdd(section.groupId)}
+									>
+										<svg
+											class="w-3.5 h-3.5"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+											viewBox="0 0 24 24"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+										</svg>
+									</button>
+								{/if}
+							</div>
+							{#if !$groupCollapse[section.key]}
+								<div
+									class={(viewMode === 'grid'
+										? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
+										: 'flex flex-col gap-4') + ' pb-4'}
+									use:dndzone={{
+										items: section.items,
+										dragDisabled,
+										flipDurationMs: FLIP_MS,
+										type: 'cards'
+									}}
+									on:consider={(e) => sectionConsider(section.key, e)}
+									on:finalize={(e) => sectionFinalize(section.key, e)}
+								>
+									{#each section.items as m (m.id)}
+										<MonitorCard
+											{...m}
+											showDetails={openCardId === m.id}
+											onToggleDetails={() => toggleCardDetails(m.id)}
+											onDeleted={fetchMonitors}
+											groups={$groups}
+											onAssignGroup={assignGroup}
+											compact={viewMode === 'list'}
+										/>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+				{#if ungroupedSection}
+					{@const section = ungroupedSection}
 					<div>
 						<div class="flex items-center gap-1">
 							<button
@@ -916,6 +1121,14 @@
 								class={(viewMode === 'grid'
 									? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start'
 									: 'flex flex-col gap-4') + ' pb-4'}
+								use:dndzone={{
+									items: section.items,
+									dragDisabled,
+									flipDurationMs: FLIP_MS,
+									type: 'cards'
+								}}
+								on:consider={(e) => sectionConsider(section.key, e)}
+								on:finalize={(e) => sectionFinalize(section.key, e)}
 							>
 								{#each section.items as m (m.id)}
 									<MonitorCard
@@ -931,7 +1144,7 @@
 							</div>
 						{/if}
 					</div>
-				{/each}
+				{/if}
 			</div>
 		{/if}
 	</div>
