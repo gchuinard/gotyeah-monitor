@@ -506,8 +506,13 @@
 				</div>
 			</div>
 
+			<!-- Barre d'historique (pleine largeur) -->
+			<div class="px-6">
+				<StatusBar history={monitor.history} monitorId={monitor.id} />
+			</div>
+
 			<!-- Corps : 2 colonnes responsive -->
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6 pb-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
 				<!-- ── Colonne gauche ──────────────────────────────────────────── -->
 				<div class="flex flex-col gap-4">
 					<!-- Stats -->
@@ -575,25 +580,64 @@
 						</div>
 					{/if}
 
-					<!-- SLA mensuel -->
+					<!-- Journal d'incidents -->
 					<div class="flex flex-col gap-2">
-						<span class="eyebrow">SLA mensuel</span>
-						{#if !slaLoaded}
+						<div class="flex items-center justify-between">
+							<span class="eyebrow">Journal d'incidents</span>
+							{#if incidentsLoaded && incidents.length > 0}
+								<span class="text-[10px] text-slate-500 tabular-nums"
+									>{incidents.length} sur 50 max</span
+								>
+							{/if}
+						</div>
+						{#if !incidentsLoaded}
 							<p class="text-xs text-slate-500">Chargement...</p>
-						{:else if slaMonths.length === 0}
-							<p class="text-xs text-slate-500">Pas encore de données mensuelles.</p>
+						{:else if incidents.length === 0}
+							<p class="text-xs text-slate-500">Aucun incident enregistré. 🎉</p>
 						{:else}
 							<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
-								{#each slaMonths as sla (sla.month)}
+								{#each incidents as inc (inc.id)}
 									<div
-										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+										class="flex flex-col gap-1 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
 									>
-										<span class="font-medium text-slate-300">{sla.month}</span>
-										<span
-											class={`ml-auto font-mono font-semibold tabular-nums ${sla.uptime === null ? 'text-slate-500' : sla.uptime >= 99.5 ? 'text-emerald-400' : sla.uptime >= 95 ? 'text-yellow-400' : 'text-red-400'}`}
-										>
-											{sla.uptime === null ? '—' : sla.uptime.toFixed(2) + '%'}
-										</span>
+										<div class="flex items-center gap-2">
+											<span
+												class={`w-1.5 h-1.5 rounded-full shrink-0 ${inc.ended_at ? 'bg-slate-500' : 'bg-red-400 animate-pulse'}`}
+											></span>
+											<span
+												class={`font-medium ${inc.ended_at ? 'text-slate-400' : 'text-rose-300'}`}
+												>{inc.ended_at ? 'Résolu' : 'En cours'}</span
+											>
+											{#if inc.last_status_code}<span
+													class="text-slate-500 font-mono text-[11px] tabular-nums"
+													>code {inc.last_status_code}</span
+												>{/if}
+											<span class="text-rose-300 font-mono text-[11px] tabular-nums"
+												>{incidentDuration(inc)}</span
+											>
+											<span class="ml-auto text-slate-500 font-mono text-[11px] tabular-nums"
+												>{toUtcDate(inc.started_at).toLocaleString('fr-FR', {
+													day: '2-digit',
+													month: '2-digit',
+													hour: '2-digit',
+													minute: '2-digit'
+												})}</span
+											>
+										</div>
+										<div class="flex items-center gap-2">
+											<button
+												type="button"
+												class={`text-[11px] shrink-0 ${inc.acknowledged_at ? 'text-emerald-400' : 'text-cyan-400 hover:text-cyan-300'}`}
+												on:click={() => ackIncident(inc)}
+												>{inc.acknowledged_at ? '✓ acquitté' : 'Acquitter'}</button
+											>
+											<input
+												class="field-dark flex-1 text-[11px]"
+												placeholder="Post-mortem / note…"
+												bind:value={drafts[inc.id]}
+												on:change={() => savePostmortem(inc)}
+											/>
+										</div>
 									</div>
 								{/each}
 							</div>
@@ -644,67 +688,10 @@
 							>{mwSubmitting ? '...' : 'Planifier'}</button
 						>
 					</div>
-
-					<!-- Footer actions (épinglé en bas de colonne) -->
-					{#if !showConfirmDelete}
-						<div
-							class="mt-auto border-t border-slate-800 pt-4 flex items-center justify-between gap-3"
-						>
-							<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
-								<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
-								<span>Créé le : {formatDate(monitor.createdAt)}</span>
-							</div>
-							<div class="flex shrink-0 items-center gap-2">
-								<button class="btn btn-sm btn-primary" on:click={openEdit}> Modifier </button>
-								<button
-									class="btn btn-sm btn-danger disabled:opacity-50"
-									on:click={() => (showConfirmDelete = true)}
-									disabled={deleting}
-								>
-									Supprimer
-								</button>
-							</div>
-						</div>
-					{:else}
-						<div class="mt-auto border-t border-slate-800 pt-4 flex flex-col gap-3">
-							<p class="text-xs text-slate-400">
-								Tape <strong class="text-white">{monitor.name}</strong> pour confirmer la suppression.
-							</p>
-							<input
-								type="text"
-								class="w-full rounded-lg border border-rose-400 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
-								bind:value={deleteConfirmText}
-								placeholder={monitor.name}
-								disabled={deleting}
-							/>
-							<div class="flex gap-2 justify-end">
-								<button
-									class="btn btn-sm btn-secondary"
-									on:click={() => {
-										showConfirmDelete = false;
-										deleteConfirmText = '';
-									}}
-									disabled={deleting}
-								>
-									Annuler
-								</button>
-								<button
-									class="btn btn-sm btn-danger disabled:opacity-50"
-									on:click={confirmDelete}
-									disabled={deleting || deleteConfirmText !== monitor.name}
-								>
-									{deleting ? 'Suppression...' : 'Supprimer définitivement'}
-								</button>
-							</div>
-						</div>
-					{/if}
 				</div>
 
 				<!-- ── Colonne droite ──────────────────────────────────────────── -->
 				<div class="flex flex-col gap-4">
-					<!-- Barre d'historique -->
-					<StatusBar history={monitor.history} monitorId={monitor.id} />
-
 					<!-- Graphiques -->
 					<div class="flex flex-col gap-4">
 						<!-- Tabs -->
@@ -831,64 +818,25 @@
 						{/if}
 					</div>
 
-					<!-- Journal d'incidents -->
+					<!-- SLA mensuel -->
 					<div class="flex flex-col gap-2">
-						<div class="flex items-center justify-between">
-							<span class="eyebrow">Journal d'incidents</span>
-							{#if incidentsLoaded && incidents.length > 0}
-								<span class="text-[10px] text-slate-500 tabular-nums"
-									>{incidents.length} sur 50 max</span
-								>
-							{/if}
-						</div>
-						{#if !incidentsLoaded}
+						<span class="eyebrow">SLA mensuel</span>
+						{#if !slaLoaded}
 							<p class="text-xs text-slate-500">Chargement...</p>
-						{:else if incidents.length === 0}
-							<p class="text-xs text-slate-500">Aucun incident enregistré. 🎉</p>
+						{:else if slaMonths.length === 0}
+							<p class="text-xs text-slate-500">Pas encore de données mensuelles.</p>
 						{:else}
 							<div class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
-								{#each incidents as inc (inc.id)}
+								{#each slaMonths as sla (sla.month)}
 									<div
-										class="flex flex-col gap-1 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
+										class="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800/60 text-xs"
 									>
-										<div class="flex items-center gap-2">
-											<span
-												class={`w-1.5 h-1.5 rounded-full shrink-0 ${inc.ended_at ? 'bg-slate-500' : 'bg-red-400 animate-pulse'}`}
-											></span>
-											<span
-												class={`font-medium ${inc.ended_at ? 'text-slate-400' : 'text-rose-300'}`}
-												>{inc.ended_at ? 'Résolu' : 'En cours'}</span
-											>
-											{#if inc.last_status_code}<span
-													class="text-slate-500 font-mono text-[11px] tabular-nums"
-													>code {inc.last_status_code}</span
-												>{/if}
-											<span class="text-rose-300 font-mono text-[11px] tabular-nums"
-												>{incidentDuration(inc)}</span
-											>
-											<span class="ml-auto text-slate-500 font-mono text-[11px] tabular-nums"
-												>{toUtcDate(inc.started_at).toLocaleString('fr-FR', {
-													day: '2-digit',
-													month: '2-digit',
-													hour: '2-digit',
-													minute: '2-digit'
-												})}</span
-											>
-										</div>
-										<div class="flex items-center gap-2">
-											<button
-												type="button"
-												class={`text-[11px] shrink-0 ${inc.acknowledged_at ? 'text-emerald-400' : 'text-cyan-400 hover:text-cyan-300'}`}
-												on:click={() => ackIncident(inc)}
-												>{inc.acknowledged_at ? '✓ acquitté' : 'Acquitter'}</button
-											>
-											<input
-												class="field-dark flex-1 text-[11px]"
-												placeholder="Post-mortem / note…"
-												bind:value={drafts[inc.id]}
-												on:change={() => savePostmortem(inc)}
-											/>
-										</div>
+										<span class="font-medium text-slate-300">{sla.month}</span>
+										<span
+											class={`ml-auto font-mono font-semibold tabular-nums ${sla.uptime === null ? 'text-slate-500' : sla.uptime >= 99.5 ? 'text-emerald-400' : sla.uptime >= 95 ? 'text-yellow-400' : 'text-red-400'}`}
+										>
+											{sla.uptime === null ? '—' : sla.uptime.toFixed(2) + '%'}
+										</span>
 									</div>
 								{/each}
 							</div>
@@ -896,6 +844,60 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- Footer actions (pleine largeur en bas) -->
+			{#if !showConfirmDelete}
+				<div
+					class="border-t border-slate-800 px-6 pb-6 pt-4 flex items-center justify-between gap-3"
+				>
+					<div class="text-[11px] text-slate-500 flex flex-col gap-0.5">
+						<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
+						<span>Créé le : {formatDate(monitor.createdAt)}</span>
+					</div>
+					<div class="flex shrink-0 items-center gap-2">
+						<button class="btn btn-sm btn-primary" on:click={openEdit}> Modifier </button>
+						<button
+							class="btn btn-sm btn-danger disabled:opacity-50"
+							on:click={() => (showConfirmDelete = true)}
+							disabled={deleting}
+						>
+							Supprimer
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="border-t border-slate-800 px-6 pb-6 pt-4 flex flex-col gap-3">
+					<p class="text-xs text-slate-400">
+						Tape <strong class="text-white">{monitor.name}</strong> pour confirmer la suppression.
+					</p>
+					<input
+						type="text"
+						class="w-full rounded-lg border border-rose-400 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+						bind:value={deleteConfirmText}
+						placeholder={monitor.name}
+						disabled={deleting}
+					/>
+					<div class="flex gap-2 justify-end">
+						<button
+							class="btn btn-sm btn-secondary"
+							on:click={() => {
+								showConfirmDelete = false;
+								deleteConfirmText = '';
+							}}
+							disabled={deleting}
+						>
+							Annuler
+						</button>
+						<button
+							class="btn btn-sm btn-danger disabled:opacity-50"
+							on:click={confirmDelete}
+							disabled={deleting || deleteConfirmText !== monitor.name}
+						>
+							{deleting ? 'Suppression...' : 'Supprimer définitivement'}
+						</button>
+					</div>
+				</div>
+			{/if}
 		{/if}
 		<!-- fin {#if editing} -->
 	</div>

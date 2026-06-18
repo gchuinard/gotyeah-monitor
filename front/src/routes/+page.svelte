@@ -679,8 +679,8 @@
 						<button
 							type="button"
 							class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
-							   bg-amber-500 hover:bg-amber-400 text-white
-							   shadow-[0_4px_14px_-3px_rgba(251,191,36,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(251,191,36,0.55)]
+							   bg-amber-500 hover:bg-amber-600 text-white
+							   shadow-sm
 							   transition-all"
 							on:click={() => goto('/admin')}
 						>
@@ -699,8 +699,8 @@
 					<button
 						type="button"
 						class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
-						   bg-cyan-500 hover:bg-cyan-400 text-white
-						   shadow-[0_4px_14px_-3px_rgba(34,211,238,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(34,211,238,0.55)]
+						   bg-cyan-500 hover:bg-cyan-600 text-white
+						   shadow-sm
 						   transition-all"
 						on:click={openAdd}
 					>
@@ -828,8 +828,8 @@
 				<button
 					type="button"
 					class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold
-						   bg-cyan-500 hover:bg-cyan-400 text-white
-						   shadow-[0_4px_14px_-3px_rgba(34,211,238,0.45)] hover:shadow-[0_6px_18px_-4px_rgba(34,211,238,0.55)]
+						   bg-cyan-500 hover:bg-cyan-600 text-white
+						   shadow-sm
 						   transition-all"
 					on:click={openAdd}
 				>
