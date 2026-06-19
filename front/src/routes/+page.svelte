@@ -1195,7 +1195,7 @@
 					</button>
 				</div>
 			</div>
-			{#if loading || $monitors.length > 0}
+			{#if !activeTeamScheduled && (loading || $monitors.length > 0)}
 				<div class="flex items-center gap-2 px-8 pb-5">
 					<input
 						type="search"
@@ -1260,7 +1260,36 @@
 			</div>
 		{/if}
 
-		{#if !loading && $monitors.length === 0}
+		{#if activeTeamScheduled}
+			<div class="flex flex-col items-center justify-center gap-5 px-8 py-20 text-center">
+				<div
+					class="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-3xl dark:border-amber-800 dark:bg-amber-900/20"
+				>
+					⏳
+				</div>
+				<div class="flex flex-col gap-1">
+					<p class="text-base font-semibold text-slate-800 dark:text-slate-100">
+						Cet espace est suspendu
+					</p>
+					<p class="max-w-sm text-sm text-slate-400 dark:text-slate-500">
+						Le monitoring est en pause. Suppression définitive le {teamPurgeDate(
+							activeTeamScheduled
+						)}. Réactive l'espace pour reprendre la surveillance.
+					</p>
+				</div>
+				{#if isTeamAdmin}
+					<button
+						type="button"
+						class="flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600"
+						on:click={restoreActiveTeam}
+					>
+						Réactiver l'espace
+					</button>
+				{:else}
+					<p class="text-xs text-slate-400">Un administrateur de l'espace peut le réactiver.</p>
+				{/if}
+			</div>
+		{:else if !loading && $monitors.length === 0}
 			<div class="flex flex-col items-center justify-center gap-5 py-20 px-8 text-center">
 				<div
 					class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800"
