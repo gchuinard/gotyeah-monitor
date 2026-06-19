@@ -10,6 +10,7 @@ export type Team = {
 	memberCount: number;
 	alertWebhookUrl: string | null;
 	alertWebhookKind: string | null;
+	deletionScheduledAt: string | null; // ISO ; non-null = suppression différée en cours
 };
 
 // Liste des équipes du user, rechargée depuis l'API (non persistée).
@@ -54,6 +55,7 @@ type TeamFromApi = {
 	member_count: number;
 	alert_webhook_url: string | null;
 	alert_webhook_kind: string | null;
+	deletion_scheduled_at: string | null;
 };
 
 function mapTeam(t: TeamFromApi): Team {
@@ -63,7 +65,8 @@ function mapTeam(t: TeamFromApi): Team {
 		role: t.role,
 		memberCount: t.member_count,
 		alertWebhookUrl: t.alert_webhook_url,
-		alertWebhookKind: t.alert_webhook_kind
+		alertWebhookKind: t.alert_webhook_kind,
+		deletionScheduledAt: t.deletion_scheduled_at
 	};
 }
 

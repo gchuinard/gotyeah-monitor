@@ -721,6 +721,69 @@
 		}
 	}
 
+	// Suppression différée de l'espace (désactivation puis purge après 7 j), réactivable.
+	const TEAM_DELETION_GRACE_DAYS = 7;
+	let confirmDeleteTeam = false;
+	let deleteTeamConfirmText = '';
+	let deleteTeamError: string | null = null;
+	let deleteTeamSubmitting = false;
+
+	$: activeTeamScheduled = $activeTeam?.deletionScheduledAt ?? null;
+	$: activeTeamCount = $teams.filter((t) => !t.deletionScheduledAt).length;
+	// On peut supprimer si admin, espace pas déjà planifié, et il reste un AUTRE espace actif.
+	$: canDeleteActiveTeam = isTeamAdmin && !activeTeamScheduled && activeTeamCount > 1;
+
+	function teamPurgeDate(scheduledAt: string): string {
+		const d = new Date(new Date(scheduledAt).getTime() + TEAM_DELETION_GRACE_DAYS * 86400000);
+		return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+	}
+
+	function openDeleteTeam() {
+		deleteTeamConfirmText = '';
+		deleteTeamError = null;
+		confirmDeleteTeam = true;
+	}
+
+	async function scheduleDeleteTeam() {
+		const t = get(activeTeam);
+		if (!t) return;
+		deleteTeamSubmitting = true;
+		deleteTeamError = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}`, { method: 'DELETE' });
+			if (!res.ok) {
+				deleteTeamError = await parseApiError(res, 'suppression');
+				return;
+			}
+			confirmDeleteTeam = false;
+			await loadTeams();
+			// Bascule sur un espace encore actif si le courant vient d'être désactivé.
+			const stillActive = get(teams).filter((x) => !x.deletionScheduledAt);
+			if (stillActive.length && !stillActive.some((x) => x.id === get(activeTeamId))) {
+				activeTeamId.set(stillActive[0].id);
+			}
+			await loadTeamManagement();
+		} catch (e) {
+			deleteTeamError = parseNetworkError(e, 'suppression');
+		} finally {
+			deleteTeamSubmitting = false;
+		}
+	}
+
+	async function restoreActiveTeam() {
+		const t = get(activeTeam);
+		if (!t) return;
+		try {
+			const res = await apiFetch(`/teams/${t.id}/restore`, { method: 'POST' });
+			if (res.ok) {
+				await loadTeams();
+				await loadTeamManagement();
+			}
+		} catch {
+			/* best-effort */
+		}
+	}
+
 	async function submitEmailChange() {
 		profileEmailSubmitting = true;
 		profileEmailError = null;
@@ -2344,11 +2407,121 @@
 								</div>
 							{/if}
 						</div>
+
+						<!-- Suppression / réactivation de l'espace -->
+						{#if activeTeamScheduled}
+							<div
+								class="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 flex flex-col gap-1.5"
+							>
+								<p class="text-xs font-semibold text-amber-700 dark:text-amber-400">
+									⏳ Suppression programmée
+								</p>
+								<p class="text-xs text-amber-700/90 dark:text-amber-300/90">
+									Monitoring suspendu. Suppression définitive le <strong
+										>{teamPurgeDate(activeTeamScheduled)}</strong
+									>. Tu peux encore réactiver cet espace d'ici là.
+								</p>
+								{#if isTeamAdmin}
+									<div class="flex justify-end">
+										<button
+											type="button"
+											class="btn btn-sm btn-secondary"
+											on:click={restoreActiveTeam}>Réactiver l'espace</button
+										>
+									</div>
+								{/if}
+							</div>
+						{:else if isTeamAdmin}
+							<div
+								class="border-t border-slate-200 dark:border-slate-700 pt-3 mt-1 flex flex-col gap-1.5"
+							>
+								<span class="text-xs font-semibold text-rose-600 dark:text-rose-400"
+									>Zone de danger</span
+								>
+								<div class="flex items-center justify-between gap-2">
+									<span class="text-xs text-slate-500 dark:text-slate-400">
+										{canDeleteActiveTeam
+											? 'Supprime cet espace et tout son contenu.'
+											: 'Impossible de supprimer votre dernier espace actif.'}
+									</span>
+									<button
+										type="button"
+										class="btn btn-sm bg-rose-500 hover:bg-rose-600 text-white disabled:opacity-40"
+										on:click={openDeleteTeam}
+										disabled={!canDeleteActiveTeam}>Supprimer l'espace</button
+									>
+								</div>
+							</div>
+						{/if}
 					{:else}
 						<p class="text-sm text-slate-500 dark:text-slate-400">
 							Aucun espace sélectionné. Crée-en un ci-dessus.
 						</p>
 					{/if}
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if confirmDeleteTeam && $activeTeam}
+	<div
+		class="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-md bg-black/50 px-4"
+		on:click={() => (confirmDeleteTeam = false)}
+		role="presentation"
+		use:modal={() => (confirmDeleteTeam = false)}
+	>
+		<div
+			class="w-full max-w-md rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900 shadow-soft-lg"
+			on:click|stopPropagation
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="flex flex-col gap-3 px-5 py-5">
+				<div class="flex items-center gap-3">
+					<span
+						class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-xl text-rose-600 dark:bg-rose-900/40 dark:text-rose-400"
+						>⚠️</span
+					>
+					<h2 class="text-base font-semibold text-slate-800 dark:text-slate-100">
+						Supprimer l'espace « {$activeTeam.name} » ?
+					</h2>
+				</div>
+				<div
+					class="flex flex-col gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300"
+				>
+					<span
+						>Tout le contenu de l'espace sera supprimé : <strong
+							>moniteurs, groupes, destinataires, incidents et historique</strong
+						>.</span
+					>
+					<span
+						>L'espace est d'abord <strong>désactivé 7 jours</strong> (monitoring suspendu) ; tu peux
+						le
+						<strong>réactiver</strong> pendant ce délai. Passé 7 jours, la suppression est
+						<strong>définitive et irréversible</strong>.</span
+					>
+				</div>
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-500 dark:text-slate-400">
+						Pour confirmer, écris le nom de l'espace : <strong>{$activeTeam.name}</strong>
+					</span>
+					<input class="field" bind:value={deleteTeamConfirmText} placeholder={$activeTeam.name} />
+				</label>
+				{#if deleteTeamError}<p class="text-xs text-rose-500">{deleteTeamError}</p>{/if}
+				<div class="flex justify-end gap-2 pt-1">
+					<button
+						type="button"
+						class="btn btn-sm btn-secondary"
+						on:click={() => (confirmDeleteTeam = false)}>Annuler</button
+					>
+					<button
+						type="button"
+						class="btn btn-sm bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-40"
+						on:click={scheduleDeleteTeam}
+						disabled={deleteTeamSubmitting || deleteTeamConfirmText.trim() !== $activeTeam.name}
+						>{deleteTeamSubmitting ? 'Suppression...' : 'Désactiver puis supprimer'}</button
+					>
 				</div>
 			</div>
 		</div>
