@@ -427,10 +427,6 @@
 		profileNewTokenRaw = '';
 		profileTokenError = null;
 		void loadApiTokens();
-
-		newTeamName = '';
-		createTeamError = null;
-		void loadTeamManagement();
 	}
 
 	async function loadApiTokens() {
@@ -536,6 +532,21 @@
 	let myEmailError: string | null = null;
 	let newTeamName = '';
 	let createTeamError: string | null = null;
+
+	// Modal dédié « Espaces & équipes » (accès direct depuis le header).
+	let showTeams = false;
+	let teamsLoadedFor: number | null = null;
+	function openTeams() {
+		newTeamName = '';
+		createTeamError = null;
+		teamsLoadedFor = null; // force un rechargement à l'ouverture
+		showTeams = true;
+	}
+	// Recharge la gestion quand le modal est ouvert et que l'équipe gérée change.
+	$: if (showTeams && $activeTeamId !== teamsLoadedFor) {
+		teamsLoadedFor = $activeTeamId;
+		void loadTeamManagement();
+	}
 
 	$: isTeamAdmin = $activeRole === 'admin';
 
@@ -928,6 +939,21 @@
 							title="Vous êtes en lecture seule dans cette équipe">lecture seule</span
 						>
 					{/if}
+
+					<!-- Gérer les équipes / créer un espace -->
+					<button
+						type="button"
+						class="h-8 flex items-center gap-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-cyan-500 dark:hover:text-cyan-400 hover:border-cyan-300 dark:hover:border-cyan-700 transition-all text-sm font-semibold"
+						on:click={openTeams}
+						title="Gérer les équipes et créer un espace"
+					>
+						<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+							<path
+								d="M13 7a3 3 0 11-6 0 3 3 0 016 0zM7.5 11a4.5 4.5 0 00-4.473 4.001A1 1 0 004 16h8a1 1 0 00.973-1.001A4.5 4.5 0 008.5 11h-1zM16 7a2 2 0 11-4 0 2 2 0 014 0zM15.001 10a3.5 3.5 0 013.473 3.04A1 1 0 0117.5 14h-2.6a5.49 5.49 0 00-.78-2.93c.27-.046.547-.07.83-.07h.05z"
+							/>
+						</svg>
+						Équipes
+					</button>
 
 					<!-- View toggle -->
 					<div
@@ -1838,162 +1864,6 @@
 					</div>
 				</form>
 
-				<!-- Équipe (membres, rôles, webhook, préférence email) -->
-				<div
-					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
-				>
-					<p class="eyebrow">Équipe</p>
-					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
-						Les ressources appartiennent à l'équipe. Les alertes vont aux destinataires des
-						moniteurs/groupes, ou à défaut aux admins de l'équipe.
-					</p>
-
-					{#if $activeTeam}
-						{#if isTeamAdmin}
-							<label class="flex flex-col gap-1">
-								<span class="text-xs text-slate-500 dark:text-slate-400">Nom de l'équipe</span>
-								<input class="field" bind:value={teamNameDraft} />
-							</label>
-
-							<label class="flex flex-col gap-1">
-								<span class="text-xs text-slate-500 dark:text-slate-400"
-									>Webhook d'équipe (type)</span
-								>
-								<select class="field" bind:value={profileWebhookKind}>
-									<option value="discord">Discord</option>
-									<option value="slack">Slack</option>
-									<option value="ntfy">ntfy</option>
-									<option value="generic">Webhook générique (JSON)</option>
-								</select>
-							</label>
-							<label class="flex flex-col gap-1">
-								<span class="text-xs text-slate-500 dark:text-slate-400"
-									>URL du webhook (vide = désactivé)</span
-								>
-								<input
-									type="url"
-									class="field"
-									bind:value={profileWebhookUrl}
-									placeholder="https://discord.com/api/webhooks/..."
-								/>
-							</label>
-							{#if teamSettingsError}
-								<div
-									class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
-								>
-									{teamSettingsError}
-								</div>
-							{/if}
-							{#if teamSettingsSuccess}
-								<div
-									class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
-								>
-									{teamSettingsSuccess}
-								</div>
-							{/if}
-							<div class="flex justify-end">
-								<button
-									type="button"
-									class="btn btn-sm btn-primary disabled:opacity-50"
-									on:click={saveTeamSettings}
-									disabled={teamSettingsSubmitting}
-									>{teamSettingsSubmitting ? 'Enregistrement...' : "Enregistrer l'équipe"}</button
-								>
-							</div>
-						{:else}
-							<p class="text-sm text-slate-700 dark:text-slate-200">
-								{$activeTeam.name}
-								<span class="text-xs text-slate-400">· {roleLabel($activeRole ?? '')}</span>
-							</p>
-						{/if}
-
-						<!-- Ma préférence email pour cette équipe -->
-						<label
-							class="flex items-start gap-2.5 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5"
-						>
-							<input
-								type="checkbox"
-								class="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500 cursor-pointer"
-								bind:checked={myEmailEnabled}
-								on:change={saveMyEmailPref}
-							/>
-							<span class="flex flex-col">
-								<span class="text-sm text-slate-700 dark:text-slate-200"
-									>Recevoir les alertes email pour cette équipe</span
-								>
-								<span class="text-xs text-slate-400 dark:text-slate-500">
-									{myEmailEnabled
-										? `Envoyées à ${authState?.user?.email ?? 'ton adresse'} quand tu es destinataire`
-										: 'Désactivé pour cette équipe.'}
-								</span>
-							</span>
-						</label>
-						{#if myEmailError}<p class="text-xs text-rose-500">{myEmailError}</p>{/if}
-
-						<!-- Membres -->
-						<div class="flex flex-col gap-1.5">
-							<span class="text-xs text-slate-500 dark:text-slate-400"
-								>Membres ({teamMembers.length})</span
-							>
-							{#if !teamMembersLoaded}
-								<p class="text-xs text-slate-400">Chargement…</p>
-							{/if}
-							{#each teamMembers as m (m.id)}
-								<div class="flex items-center gap-2 text-xs">
-									<span class="text-slate-700 dark:text-slate-200 truncate">{m.email}</span>
-									{#if isTeamAdmin}
-										<select
-											class="ml-auto rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-1.5 py-1 text-[11px]"
-											value={m.role}
-											on:change={(e) => changeMemberRole(m.id, e.currentTarget.value)}
-										>
-											<option value="admin">Admin</option>
-											<option value="member">Membre</option>
-											<option value="readonly">Lecture seule</option>
-										</select>
-										<button
-											type="button"
-											class="text-rose-500 hover:text-rose-400"
-											on:click={() => removeMember(m.id)}>retirer</button
-										>
-									{:else}
-										<span class="ml-auto text-slate-400">{roleLabel(m.role)}</span>
-									{/if}
-								</div>
-							{/each}
-							{#if inviteError}<p class="text-xs text-rose-500">{inviteError}</p>{/if}
-							{#if isTeamAdmin}
-								<div class="flex items-center gap-2 mt-1">
-									<input
-										class="flex-1 field"
-										bind:value={inviteEmail}
-										placeholder="email d'un compte existant"
-									/>
-									<select class="field w-auto" bind:value={inviteRole}>
-										<option value="member">Membre</option>
-										<option value="readonly">Lecture seule</option>
-										<option value="admin">Admin</option>
-									</select>
-									<button type="button" class="btn btn-sm btn-primary" on:click={inviteMember}
-										>Inviter</button
-									>
-								</div>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Créer une équipe -->
-					<div
-						class="flex items-center gap-2 border-t border-slate-200 dark:border-slate-700 pt-3 mt-1"
-					>
-						<input class="flex-1 field" bind:value={newTeamName} placeholder="Créer une équipe…" />
-						<button type="button" class="btn btn-sm btn-secondary" on:click={createTeam}
-							>Créer</button
-						>
-					</div>
-					{#if createTeamError}<p class="text-xs text-rose-500">{createTeamError}</p>{/if}
-				</div>
-
 				<!-- Page publique -->
 				<form
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
@@ -2243,6 +2113,228 @@
 								{profileDeleting ? 'Suppression...' : 'Supprimer'}
 							</button>
 						</div>
+					{/if}
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showTeams}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md bg-black/40 px-4"
+		on:click={() => (showTeams = false)}
+		role="presentation"
+		use:modal={() => (showTeams = false)}
+	>
+		<div
+			class="w-full max-w-lg rounded-2xl overflow-hidden
+                   bg-white dark:bg-slate-900
+                   border border-slate-200 dark:border-slate-700
+                   shadow-soft-lg"
+			on:click|stopPropagation
+			role="dialog"
+			aria-modal="true"
+		>
+			<div class="px-5 pb-5 pt-5 flex flex-col gap-3 max-h-[80vh] overflow-y-auto">
+				<div class="flex items-center justify-between mb-1">
+					<h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
+						Espaces &amp; équipes
+					</h2>
+					<button
+						type="button"
+						class="h-7 w-7 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+						on:click={() => (showTeams = false)}
+					>
+						<svg
+							class="w-4 h-4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							viewBox="0 0 24 24"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
+
+				<!-- Créer un nouvel espace (mis en avant) -->
+				<div
+					class="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50/60 dark:bg-cyan-900/15 shadow-sm p-4 flex flex-col gap-2"
+				>
+					<p class="eyebrow">Nouvel espace</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+						Crée un espace partagé dont tu seras l'admin. Tu pourras y inviter des membres.
+					</p>
+					<div class="flex items-center gap-2">
+						<input
+							class="flex-1 field"
+							bind:value={newTeamName}
+							placeholder="Nom de l'espace (ex. Production)"
+							on:keydown={(e) => e.key === 'Enter' && createTeam()}
+						/>
+						<button type="button" class="btn btn-sm btn-primary" on:click={createTeam}>Créer</button
+						>
+					</div>
+					{#if createTeamError}<p class="text-xs text-rose-500">{createTeamError}</p>{/if}
+				</div>
+
+				<!-- Équipe à gérer -->
+				{#if $teams.length > 1}
+					<label class="flex flex-col gap-1">
+						<span class="text-xs text-slate-500 dark:text-slate-400">Espace à gérer</span>
+						<select class="field" bind:value={$activeTeamId}>
+							{#each $teams as t (t.id)}
+								<option value={t.id}>{t.name} · {roleLabel(t.role)}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
+
+				<!-- Gestion de l'espace actif -->
+				<div
+					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
+				>
+					{#if $activeTeam}
+						<div class="flex items-baseline justify-between gap-2">
+							<p class="eyebrow">{$activeTeam.name}</p>
+							<span class="text-[11px] text-slate-400">{roleLabel($activeRole ?? '')}</span>
+						</div>
+						<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
+							Les ressources appartiennent à l'espace. Les alertes vont aux destinataires des
+							moniteurs/groupes, ou à défaut aux admins de l'espace.
+						</p>
+
+						{#if isTeamAdmin}
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400">Nom de l'espace</span>
+								<input class="field" bind:value={teamNameDraft} />
+							</label>
+
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400"
+									>Webhook d'alerte (type)</span
+								>
+								<select class="field" bind:value={profileWebhookKind}>
+									<option value="discord">Discord</option>
+									<option value="slack">Slack</option>
+									<option value="ntfy">ntfy</option>
+									<option value="generic">Webhook générique (JSON)</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400"
+									>URL du webhook (vide = désactivé)</span
+								>
+								<input
+									type="url"
+									class="field"
+									bind:value={profileWebhookUrl}
+									placeholder="https://discord.com/api/webhooks/..."
+								/>
+							</label>
+							{#if teamSettingsError}
+								<div
+									class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
+								>
+									{teamSettingsError}
+								</div>
+							{/if}
+							{#if teamSettingsSuccess}
+								<div
+									class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
+								>
+									{teamSettingsSuccess}
+								</div>
+							{/if}
+							<div class="flex justify-end">
+								<button
+									type="button"
+									class="btn btn-sm btn-primary disabled:opacity-50"
+									on:click={saveTeamSettings}
+									disabled={teamSettingsSubmitting}
+									>{teamSettingsSubmitting ? 'Enregistrement...' : "Enregistrer l'espace"}</button
+								>
+							</div>
+						{/if}
+
+						<!-- Ma préférence email pour cet espace -->
+						<label
+							class="flex items-start gap-2.5 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5"
+						>
+							<input
+								type="checkbox"
+								class="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500 cursor-pointer"
+								bind:checked={myEmailEnabled}
+								on:change={saveMyEmailPref}
+							/>
+							<span class="flex flex-col">
+								<span class="text-sm text-slate-700 dark:text-slate-200"
+									>Recevoir les alertes email pour cet espace</span
+								>
+								<span class="text-xs text-slate-400 dark:text-slate-500">
+									{myEmailEnabled
+										? `Envoyées à ${authState?.user?.email ?? 'ton adresse'} quand tu es destinataire`
+										: 'Désactivé pour cet espace.'}
+								</span>
+							</span>
+						</label>
+						{#if myEmailError}<p class="text-xs text-rose-500">{myEmailError}</p>{/if}
+
+						<!-- Membres -->
+						<div class="flex flex-col gap-1.5">
+							<span class="text-xs text-slate-500 dark:text-slate-400"
+								>Membres ({teamMembers.length})</span
+							>
+							{#if !teamMembersLoaded}
+								<p class="text-xs text-slate-400">Chargement…</p>
+							{/if}
+							{#each teamMembers as m (m.id)}
+								<div class="flex items-center gap-2 text-xs">
+									<span class="text-slate-700 dark:text-slate-200 truncate">{m.email}</span>
+									{#if isTeamAdmin}
+										<select
+											class="ml-auto rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-1.5 py-1 text-[11px]"
+											value={m.role}
+											on:change={(e) => changeMemberRole(m.id, e.currentTarget.value)}
+										>
+											<option value="admin">Admin</option>
+											<option value="member">Membre</option>
+											<option value="readonly">Lecture seule</option>
+										</select>
+										<button
+											type="button"
+											class="text-rose-500 hover:text-rose-400"
+											on:click={() => removeMember(m.id)}>retirer</button
+										>
+									{:else}
+										<span class="ml-auto text-slate-400">{roleLabel(m.role)}</span>
+									{/if}
+								</div>
+							{/each}
+							{#if inviteError}<p class="text-xs text-rose-500">{inviteError}</p>{/if}
+							{#if isTeamAdmin}
+								<div class="flex items-center gap-2 mt-1">
+									<input
+										class="flex-1 field"
+										bind:value={inviteEmail}
+										placeholder="email d'un compte existant"
+									/>
+									<select class="field w-auto" bind:value={inviteRole}>
+										<option value="member">Membre</option>
+										<option value="readonly">Lecture seule</option>
+										<option value="admin">Admin</option>
+									</select>
+									<button type="button" class="btn btn-sm btn-primary" on:click={inviteMember}
+										>Inviter</button
+									>
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<p class="text-sm text-slate-500 dark:text-slate-400">
+							Aucun espace sélectionné. Crée-en un ci-dessus.
+						</p>
 					{/if}
 				</div>
 			</div>
