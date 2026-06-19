@@ -1,16 +1,27 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { apiFetch } from '$lib/utils/api';
+	import { activeTeamId, loadTeams } from '$lib/stores/teams';
 
 	let name = '';
 	let url = '';
 	let type = 'http';
 	let expectedStatusCode = 200;
+	let environment = '';
 
 	let submitting = false;
 	let error: string | null = null;
 
+	onMount(loadTeams);
+
 	async function onSubmit() {
+		const teamId = get(activeTeamId);
+		if (teamId == null) {
+			error = 'Aucune équipe active. Crée une équipe depuis le tableau de bord.';
+			return;
+		}
 		submitting = true;
 		error = null;
 
@@ -18,7 +29,14 @@
 			const res = await apiFetch('/monitors', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name, url, type, expected_status_code: expectedStatusCode })
+				body: JSON.stringify({
+					name,
+					url,
+					type,
+					expected_status_code: expectedStatusCode,
+					environment: environment.trim() || null,
+					team_id: teamId
+				})
 			});
 
 			if (!res.ok) {
@@ -93,6 +111,21 @@
 						bind:value={expectedStatusCode}
 					/>
 					<span class="text-xs text-slate-400 dark:text-slate-500">Par défaut 200 (OK).</span>
+				</label>
+
+				<label class="flex flex-col gap-1">
+					<span class="text-sm text-slate-600 dark:text-slate-300">Environnement</span>
+					<input
+						class="field"
+						list="env-presets-addpage"
+						bind:value={environment}
+						placeholder="prod, staging, dev… (optionnel)"
+					/>
+					<datalist id="env-presets-addpage">
+						<option value="prod"></option>
+						<option value="staging"></option>
+						<option value="dev"></option>
+					</datalist>
 				</label>
 
 				{#if error}

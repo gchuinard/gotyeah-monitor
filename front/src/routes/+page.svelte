@@ -6,10 +6,21 @@
 	import { modal } from '$lib/actions/modal';
 	import { groups, loadGroups } from '$lib/stores/groups';
 	import { groupCollapse, toggleGroupCollapse } from '$lib/stores/groupCollapse';
+	import {
+		teams,
+		activeTeamId,
+		activeTeam,
+		activeRole,
+		canWrite,
+		loadTeams,
+		type TeamRole
+	} from '$lib/stores/teams';
 	import MonitorCard from '$lib/components/MonitorCard.svelte';
 	import MonitorDetailModal from '$lib/components/MonitorDetailModal.svelte';
+	import RecipientsEditor from '$lib/components/RecipientsEditor.svelte';
 	import PasswordStrength from '$lib/components/PasswordStrength.svelte';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import { goto, preloadCode } from '$app/navigation';
 	import {
 		sortMode,
@@ -42,6 +53,8 @@
 		latency_threshold_ms: number | null;
 		port: number | null;
 		group_id: number | null;
+		team_id: number | null;
+		environment: string | null;
 		is_public: boolean;
 		in_maintenance: boolean;
 		created_at: string;
@@ -53,6 +66,10 @@
 	let viewMode: 'grid' | 'list' = 'grid';
 	let isAdmin = false;
 	let openCardId: number | null = null;
+
+	// Rôle dans l'équipe active : readonly => pas d'actions d'écriture.
+	$: isReadonly = $activeRole === 'readonly';
+	$: canEdit = canWrite($activeRole);
 
 	function toggleCardDetails(id: number) {
 		openCardId = openCardId === id ? null : id;
@@ -70,9 +87,13 @@
 	let addLatencyThresholdMs: number | null = null;
 	let addPort: number | null = null;
 	let addGroupId: number | null = null;
+	let addEnvironment = '';
 	let addIsPublic = false;
 	let addSubmitting = false;
 	let addError: string | null = null;
+
+	// Filtre par environnement sur le dashboard.
+	let envFilter = '';
 
 	function openAdd(groupId: number | null = null) {
 		addName = '';
@@ -85,12 +106,18 @@
 		addLatencyThresholdMs = null;
 		addPort = null;
 		addGroupId = groupId;
+		addEnvironment = '';
 		addIsPublic = false;
 		addError = null;
 		showAdd = true;
 	}
 
 	async function submitAdd() {
+		const teamId = get(activeTeamId);
+		if (teamId == null) {
+			addError = 'Aucune équipe active. Crée une équipe dans ton profil.';
+			return;
+		}
 		addSubmitting = true;
 		addError = null;
 		try {
@@ -108,7 +135,9 @@
 					latency_threshold_ms: addLatencyThresholdMs || null,
 					port: addType === 'port' ? addPort : null,
 					group_id: addGroupId == null ? null : Number(addGroupId),
-					is_public: addIsPublic
+					environment: addEnvironment.trim() || null,
+					is_public: addIsPublic,
+					team_id: teamId
 				})
 			});
 			if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
@@ -126,6 +155,7 @@
 	let showGroups = false;
 	let newGroupName = '';
 	let groupActionError: string | null = null;
+	let groupRecipientsOpen: number | null = null;
 
 	async function assignGroup(monitorId, groupId) {
 		const mon = $monitors.find((x) => x.id === monitorId);
@@ -145,6 +175,7 @@
 					latency_threshold_ms: mon.latencyThresholdMs,
 					port: mon.port,
 					group_id: groupId,
+					environment: mon.environment,
 					is_public: mon.isPublic
 				})
 			});
@@ -157,19 +188,24 @@
 	async function createGroup() {
 		const name = newGroupName.trim();
 		if (!name) return;
+		const teamId = get(activeTeamId);
+		if (teamId == null) {
+			groupActionError = 'Aucune équipe active.';
+			return;
+		}
 		groupActionError = null;
 		try {
 			const res = await apiFetch('/groups', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name })
+				body: JSON.stringify({ name, team_id: teamId })
 			});
 			if (!res.ok) {
 				groupActionError = await parseApiError(res, 'groupe');
 				return;
 			}
 			newGroupName = '';
-			await loadGroups();
+			await loadGroups(get(activeTeamId));
 		} catch (e) {
 			groupActionError = parseNetworkError(e, 'groupe');
 		}
@@ -184,7 +220,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ name: n })
 			});
-			await loadGroups();
+			await loadGroups(get(activeTeamId));
 		} catch {
 			/* ignore */
 		}
@@ -193,7 +229,7 @@
 	async function deleteGroup(id: number) {
 		try {
 			await apiFetch(`/groups/${id}`, { method: 'DELETE' });
-			await loadGroups();
+			await loadGroups(get(activeTeamId));
 			await fetchMonitors();
 		} catch {
 			/* ignore */
@@ -201,9 +237,14 @@
 	}
 
 	$: q = search.trim().toLowerCase();
-	$: filteredMonitors = q
-		? $monitors.filter((m) => m.name.toLowerCase().includes(q) || m.url.toLowerCase().includes(q))
-		: $monitors;
+	$: envOptions = Array.from(
+		new Set($monitors.map((m) => m.environment).filter((e): e is string => !!e))
+	).sort((a, b) => a.localeCompare(b, 'fr'));
+	$: filteredMonitors = $monitors.filter((m) => {
+		if (q && !(m.name.toLowerCase().includes(q) || m.url.toLowerCase().includes(q))) return false;
+		if (envFilter && (m.environment ?? '') !== envFilter) return false;
+		return true;
+	});
 	$: groupSections = [
 		...$groups.map((g) => ({
 			key: String(g.id),
@@ -349,13 +390,9 @@
 		profilePasswordValid &&
 		profilePassword === profileConfirmPassword;
 
-	// Notifications (email + webhook d'alerte)
-	let profileAlertEmailEnabled = true;
+	// Webhook d'alerte de l'équipe (réutilisé par la section Équipe).
 	let profileWebhookUrl = '';
 	let profileWebhookKind = 'discord';
-	let profileWebhookSubmitting = false;
-	let profileWebhookError: string | null = null;
-	let profileWebhookSuccess: string | null = null;
 	let profileStatusPageSlug = '';
 	let profileStatusPageTitle = '';
 	let profileStatusPageSubmitting = false;
@@ -379,11 +416,8 @@
 		profileConfirmPassword = '';
 		profilePasswordError = null;
 		profilePasswordSuccess = null;
-		profileAlertEmailEnabled = true;
 		profileWebhookUrl = '';
 		profileWebhookKind = 'discord';
-		profileWebhookError = null;
-		profileWebhookSuccess = null;
 		profileConfirmDelete = false;
 		profileDeleteConfirmText = '';
 		showProfile = true;
@@ -394,18 +428,9 @@
 		profileTokenError = null;
 		void loadApiTokens();
 
-		// Pré-remplit la config notifications actuelle (best-effort).
-		try {
-			const res = await apiFetch('/auth/me');
-			if (res.ok) {
-				const me = await res.json();
-				profileAlertEmailEnabled = me.alert_email_enabled ?? true;
-				profileWebhookUrl = me.alert_webhook_url ?? '';
-				profileWebhookKind = me.alert_webhook_kind ?? 'discord';
-			}
-		} catch {
-			/* best-effort */
-		}
+		newTeamName = '';
+		createTeamError = null;
+		void loadTeamManagement();
 	}
 
 	async function loadApiTokens() {
@@ -490,29 +515,187 @@
 		}
 	}
 
-	async function saveNotifications() {
-		profileWebhookSubmitting = true;
-		profileWebhookError = null;
-		profileWebhookSuccess = null;
+	// ── Gestion d'équipe (membres, rôles, webhook, préférence email) ──────────
+	type TeamMemberRow = {
+		id: number;
+		user_id: number;
+		email: string;
+		role: TeamRole;
+		alert_email_enabled: boolean;
+	};
+	let teamMembers: TeamMemberRow[] = [];
+	let teamMembersLoaded = false;
+	let teamNameDraft = '';
+	let teamSettingsError: string | null = null;
+	let teamSettingsSuccess: string | null = null;
+	let teamSettingsSubmitting = false;
+	let inviteEmail = '';
+	let inviteRole: TeamRole = 'member';
+	let inviteError: string | null = null;
+	let myEmailEnabled = true;
+	let myEmailError: string | null = null;
+	let newTeamName = '';
+	let createTeamError: string | null = null;
+
+	$: isTeamAdmin = $activeRole === 'admin';
+
+	function roleLabel(r: string): string {
+		return r === 'admin' ? 'Admin' : r === 'member' ? 'Membre' : 'Lecture seule';
+	}
+
+	async function loadTeamManagement() {
+		teamMembers = [];
+		teamMembersLoaded = false;
+		teamSettingsError = null;
+		teamSettingsSuccess = null;
+		inviteError = null;
+		myEmailError = null;
+		const t = get(activeTeam);
+		if (!t) {
+			teamMembersLoaded = true;
+			return;
+		}
+		teamNameDraft = t.name;
+		profileWebhookUrl = t.alertWebhookUrl ?? '';
+		profileWebhookKind = t.alertWebhookKind ?? 'discord';
 		try {
-			const res = await apiFetch('/auth/me', {
+			const res = await apiFetch(`/teams/${t.id}/members`);
+			if (res.ok) {
+				teamMembers = (await res.json()) as TeamMemberRow[];
+				const me = teamMembers.find((m) => m.user_id === authState?.user?.id);
+				if (me) myEmailEnabled = me.alert_email_enabled;
+			}
+		} catch {
+			/* best-effort */
+		} finally {
+			teamMembersLoaded = true;
+		}
+	}
+
+	async function saveTeamSettings() {
+		const t = get(activeTeam);
+		if (!t) return;
+		teamSettingsSubmitting = true;
+		teamSettingsError = null;
+		teamSettingsSuccess = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					alert_email_enabled: profileAlertEmailEnabled,
+					name: teamNameDraft.trim() || t.name,
 					alert_webhook_url: profileWebhookUrl,
 					alert_webhook_kind: profileWebhookKind
 				})
 			});
 			if (!res.ok) {
-				profileWebhookError = await parseApiError(res, 'notifications');
+				teamSettingsError = await parseApiError(res, 'équipe');
 			} else {
-				profileWebhookSuccess = 'Préférences de notification enregistrées.';
+				teamSettingsSuccess = 'Paramètres de l’équipe enregistrés.';
+				await loadTeams();
 			}
 		} catch (e) {
-			profileWebhookError = parseNetworkError(e, 'notifications');
+			teamSettingsError = parseNetworkError(e, 'équipe');
 		} finally {
-			profileWebhookSubmitting = false;
+			teamSettingsSubmitting = false;
+		}
+	}
+
+	async function saveMyEmailPref() {
+		const t = get(activeTeam);
+		if (!t) return;
+		myEmailError = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}/me`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ alert_email_enabled: myEmailEnabled })
+			});
+			if (!res.ok) myEmailError = await parseApiError(res, 'préférence');
+		} catch (e) {
+			myEmailError = parseNetworkError(e, 'préférence');
+		}
+	}
+
+	async function inviteMember() {
+		const t = get(activeTeam);
+		if (!t || !inviteEmail.trim()) return;
+		inviteError = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}/members`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole })
+			});
+			if (!res.ok) {
+				inviteError = await parseApiError(res, 'invitation');
+				return;
+			}
+			inviteEmail = '';
+			inviteRole = 'member';
+			await loadTeamManagement();
+			await loadTeams();
+		} catch (e) {
+			inviteError = parseNetworkError(e, 'invitation');
+		}
+	}
+
+	async function changeMemberRole(memberId: number, role: string) {
+		const t = get(activeTeam);
+		if (!t) return;
+		inviteError = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}/members/${memberId}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ role })
+			});
+			if (!res.ok) inviteError = await parseApiError(res, 'rôle');
+			await loadTeamManagement();
+			await loadTeams();
+		} catch (e) {
+			inviteError = parseNetworkError(e, 'rôle');
+		}
+	}
+
+	async function removeMember(memberId: number) {
+		const t = get(activeTeam);
+		if (!t) return;
+		inviteError = null;
+		try {
+			const res = await apiFetch(`/teams/${t.id}/members/${memberId}`, { method: 'DELETE' });
+			if (!res.ok && res.status !== 204) {
+				inviteError = await parseApiError(res, 'membre');
+				return;
+			}
+			await loadTeamManagement();
+			await loadTeams();
+		} catch (e) {
+			inviteError = parseNetworkError(e, 'membre');
+		}
+	}
+
+	async function createTeam() {
+		const name = newTeamName.trim();
+		if (!name) return;
+		createTeamError = null;
+		try {
+			const res = await apiFetch('/teams', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+			if (!res.ok) {
+				createTeamError = await parseApiError(res, 'équipe');
+				return;
+			}
+			const created = await res.json();
+			newTeamName = '';
+			await loadTeams();
+			activeTeamId.set(created.id);
+			await loadTeamManagement();
+		} catch (e) {
+			createTeamError = parseNetworkError(e, 'équipe');
 		}
 	}
 
@@ -610,7 +793,12 @@
 				return;
 			}
 
-			const res = await apiFetch('/monitors', { signal });
+			const tid = get(activeTeamId);
+			if (tid == null) {
+				monitors.set([]);
+				return;
+			}
+			const res = await apiFetch(`/monitors?team_id=${tid}`, { signal });
 
 			if (!res.ok) {
 				throw new Error(await parseApiError(res, 'chargement des monitors'));
@@ -645,6 +833,8 @@
 					latencyThresholdMs: m.latency_threshold_ms,
 					port: m.port,
 					groupId: m.group_id,
+					teamId: m.team_id,
+					environment: m.environment,
 					isPublic: m.is_public,
 					inMaintenance: m.in_maintenance,
 					createdAt: m.created_at
@@ -673,9 +863,24 @@
 		}
 	}
 
-	onMount(() => {
-		fetchMonitors();
-		loadGroups();
+	// Recharge monitors + groupes quand l'équipe active change (après le 1er chargement).
+	let teamsReady = false;
+	let lastTeamLoaded: number | null | undefined = undefined;
+	async function reloadForActiveTeam() {
+		await Promise.all([fetchMonitors(), loadGroups(get(activeTeamId))]);
+	}
+	$: if (teamsReady && $activeTeamId !== lastTeamLoaded) {
+		lastTeamLoaded = $activeTeamId;
+		reloadForActiveTeam();
+	}
+
+	onMount(async () => {
+		if (!authState?.token) {
+			await goto('/login');
+			return;
+		}
+		await loadTeams();
+		teamsReady = true; // déclenche reloadForActiveTeam via le bloc réactif ci-dessus
 		checkAdmin();
 		preloadCode('/profile', '/add', '/login');
 	});
@@ -704,6 +909,26 @@
 
 				<!-- Right: actions -->
 				<div class="flex items-center gap-2">
+					<!-- Sélecteur d'équipe + rôle -->
+					{#if $teams.length > 0}
+						<select
+							bind:value={$activeTeamId}
+							class="field w-auto shrink-0 text-sm max-w-[160px]"
+							title="Équipe active"
+							aria-label="Équipe active"
+						>
+							{#each $teams as t (t.id)}
+								<option value={t.id}>{t.name}</option>
+							{/each}
+						</select>
+					{/if}
+					{#if isReadonly}
+						<span
+							class="px-2 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap"
+							title="Vous êtes en lecture seule dans cette équipe">lecture seule</span
+						>
+					{/if}
+
 					<!-- View toggle -->
 					<div
 						class="flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/80 p-0.5 gap-0.5 cursor-pointer"
@@ -804,25 +1029,27 @@
 					{/if}
 
 					<!-- Add button -->
-					<button
-						type="button"
-						class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
+					{#if canEdit}
+						<button
+							type="button"
+							class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold
 						   bg-cyan-500 hover:bg-cyan-600 text-white
 						   shadow-sm
 						   transition-all"
-						on:click={openAdd}
-					>
-						<svg
-							class="w-3.5 h-3.5"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="3"
-							viewBox="0 0 24 24"
+							on:click={() => openAdd()}
 						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-						</svg>
-						Ajouter
-					</button>
+							<svg
+								class="w-3.5 h-3.5"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="3"
+								viewBox="0 0 24 24"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+							</svg>
+							Ajouter
+						</button>
+					{/if}
 
 					<!-- Separator -->
 					<div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
@@ -884,13 +1111,28 @@
 							<option value={opt.value}>{opt.label}</option>
 						{/each}
 					</select>
-					<button
-						type="button"
-						class="btn btn-sm btn-secondary whitespace-nowrap"
-						on:click={() => (showGroups = true)}
-					>
-						Gérer les groupes
-					</button>
+					{#if envOptions.length > 0}
+						<select
+							bind:value={envFilter}
+							class="field w-auto shrink-0"
+							title="Filtrer par environnement"
+							aria-label="Filtrer par environnement"
+						>
+							<option value="">Tous les environnements</option>
+							{#each envOptions as env (env)}
+								<option value={env}>{env}</option>
+							{/each}
+						</select>
+					{/if}
+					{#if canEdit}
+						<button
+							type="button"
+							class="btn btn-sm btn-secondary whitespace-nowrap"
+							on:click={() => (showGroups = true)}
+						>
+							Gérer les groupes
+						</button>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -943,25 +1185,27 @@
 						Ajoutez votre premier site ou service à surveiller pour commencer.
 					</p>
 				</div>
-				<button
-					type="button"
-					class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold
+				{#if canEdit}
+					<button
+						type="button"
+						class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold
 						   bg-cyan-500 hover:bg-cyan-600 text-white
 						   shadow-sm
 						   transition-all"
-					on:click={openAdd}
-				>
-					<svg
-						class="w-4 h-4"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="3"
-						viewBox="0 0 24 24"
+						on:click={() => openAdd()}
 					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-					</svg>
-					Ajouter un moniteur
-				</button>
+						<svg
+							class="w-4 h-4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="3"
+							viewBox="0 0 24 24"
+						>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+						</svg>
+						Ajouter un moniteur
+					</button>
+				{/if}
 			</div>
 		{:else if $groups.length === 0}
 			<div
@@ -1041,7 +1285,7 @@
 										</span>
 									{/if}
 								</button>
-								{#if section.groupId !== null}
+								{#if section.groupId !== null && canEdit}
 									<button
 										type="button"
 										class="h-6 w-6 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-500 hover:bg-cyan-500/10 transition-colors shrink-0"
@@ -1309,6 +1553,20 @@
 						</select>
 					</label>
 				{/if}
+				<label class="flex flex-col gap-1">
+					<span class="text-xs text-slate-500 dark:text-slate-400">Environnement</span>
+					<input
+						class="field"
+						list="env-presets-add"
+						bind:value={addEnvironment}
+						placeholder="prod, staging, dev… (optionnel)"
+					/>
+					<datalist id="env-presets-add">
+						<option value="prod"></option>
+						<option value="staging"></option>
+						<option value="dev"></option>
+					</datalist>
+				</label>
 				{#if addType === 'http'}
 					<div class="grid grid-cols-2 gap-3">
 						<label class="flex flex-col gap-1">
@@ -1430,6 +1688,26 @@
 								<option value={String(opt.id)}>{opt.name}</option>
 							{/each}
 						</select>
+						<button
+							type="button"
+							class="self-start text-[11px] text-cyan-600 hover:underline"
+							on:click={() => (groupRecipientsOpen = groupRecipientsOpen === g.id ? null : g.id)}
+						>
+							{groupRecipientsOpen === g.id ? '▾' : '▸'} Destinataires d'alerte du groupe
+						</button>
+						{#if groupRecipientsOpen === g.id}
+							<div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2">
+								<p class="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5">
+									Notifiés pour tous les moniteurs de ce groupe (en plus des destinataires propres à
+									chaque moniteur).
+								</p>
+								<RecipientsEditor
+									basePath={`/groups/${g.id}`}
+									teamId={$activeTeamId}
+									dark={false}
+								/>
+							</div>
+						{/if}
 					</div>
 				{/each}
 				{#if $groups.length === 0}
@@ -1560,85 +1838,161 @@
 					</div>
 				</form>
 
-				<!-- Notifications (email + webhook) -->
-				<form
+				<!-- Équipe (membres, rôles, webhook, préférence email) -->
+				<div
 					class="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm p-4 flex flex-col gap-3"
-					on:submit|preventDefault={saveNotifications}
 				>
-					<p class="eyebrow">Notifications</p>
+					<p class="eyebrow">Équipe</p>
 					<p class="text-xs text-slate-500 dark:text-slate-400 -mt-1">
-						Les alertes (panne, rétablissement, expiration SSL) sont envoyées par email, et en
-						option via un webhook.
+						Les ressources appartiennent à l'équipe. Les alertes vont aux destinataires des
+						moniteurs/groupes, ou à défaut aux admins de l'équipe.
 					</p>
 
-					<!-- Alertes email -->
-					<label
-						class="flex items-start gap-2.5 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5"
-					>
-						<input
-							type="checkbox"
-							class="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500 cursor-pointer"
-							bind:checked={profileAlertEmailEnabled}
-						/>
-						<span class="flex flex-col">
-							<span class="text-sm text-slate-700 dark:text-slate-200"
-								>Recevoir les alertes par email</span
-							>
-							<span class="text-xs text-slate-400 dark:text-slate-500">
-								{profileAlertEmailEnabled
-									? `Envoyées à ${authState?.user?.email ?? 'ton adresse'}`
-									: 'Désactivé — seul le webhook (si configuré) sera utilisé.'}
+					{#if $activeTeam}
+						{#if isTeamAdmin}
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400">Nom de l'équipe</span>
+								<input class="field" bind:value={teamNameDraft} />
+							</label>
+
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400"
+									>Webhook d'équipe (type)</span
+								>
+								<select class="field" bind:value={profileWebhookKind}>
+									<option value="discord">Discord</option>
+									<option value="slack">Slack</option>
+									<option value="ntfy">ntfy</option>
+									<option value="generic">Webhook générique (JSON)</option>
+								</select>
+							</label>
+							<label class="flex flex-col gap-1">
+								<span class="text-xs text-slate-500 dark:text-slate-400"
+									>URL du webhook (vide = désactivé)</span
+								>
+								<input
+									type="url"
+									class="field"
+									bind:value={profileWebhookUrl}
+									placeholder="https://discord.com/api/webhooks/..."
+								/>
+							</label>
+							{#if teamSettingsError}
+								<div
+									class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
+								>
+									{teamSettingsError}
+								</div>
+							{/if}
+							{#if teamSettingsSuccess}
+								<div
+									class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
+								>
+									{teamSettingsSuccess}
+								</div>
+							{/if}
+							<div class="flex justify-end">
+								<button
+									type="button"
+									class="btn btn-sm btn-primary disabled:opacity-50"
+									on:click={saveTeamSettings}
+									disabled={teamSettingsSubmitting}
+									>{teamSettingsSubmitting ? 'Enregistrement...' : "Enregistrer l'équipe"}</button
+								>
+							</div>
+						{:else}
+							<p class="text-sm text-slate-700 dark:text-slate-200">
+								{$activeTeam.name}
+								<span class="text-xs text-slate-400">· {roleLabel($activeRole ?? '')}</span>
+							</p>
+						{/if}
+
+						<!-- Ma préférence email pour cette équipe -->
+						<label
+							class="flex items-start gap-2.5 cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2.5"
+						>
+							<input
+								type="checkbox"
+								class="mt-0.5 h-4 w-4 shrink-0 accent-cyan-500 cursor-pointer"
+								bind:checked={myEmailEnabled}
+								on:change={saveMyEmailPref}
+							/>
+							<span class="flex flex-col">
+								<span class="text-sm text-slate-700 dark:text-slate-200"
+									>Recevoir les alertes email pour cette équipe</span
+								>
+								<span class="text-xs text-slate-400 dark:text-slate-500">
+									{myEmailEnabled
+										? `Envoyées à ${authState?.user?.email ?? 'ton adresse'} quand tu es destinataire`
+										: 'Désactivé pour cette équipe.'}
+								</span>
 							</span>
-						</span>
-					</label>
+						</label>
+						{#if myEmailError}<p class="text-xs text-rose-500">{myEmailError}</p>{/if}
 
-					<label class="flex flex-col gap-1">
-						<span class="text-xs text-slate-500 dark:text-slate-400">Webhook (type)</span>
-						<select class="field" bind:value={profileWebhookKind}>
-							<option value="discord">Discord</option>
-							<option value="slack">Slack</option>
-							<option value="ntfy">ntfy</option>
-							<option value="generic">Webhook générique (JSON)</option>
-						</select>
-					</label>
-
-					<label class="flex flex-col gap-1">
-						<span class="text-xs text-slate-500 dark:text-slate-400"
-							>URL du webhook (vide = désactivé)</span
-						>
-						<input
-							type="url"
-							class="field"
-							bind:value={profileWebhookUrl}
-							placeholder="https://discord.com/api/webhooks/..."
-						/>
-					</label>
-
-					{#if profileWebhookError}
-						<div
-							class="text-xs text-rose-600 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2"
-						>
-							{profileWebhookError}
+						<!-- Membres -->
+						<div class="flex flex-col gap-1.5">
+							<span class="text-xs text-slate-500 dark:text-slate-400"
+								>Membres ({teamMembers.length})</span
+							>
+							{#if !teamMembersLoaded}
+								<p class="text-xs text-slate-400">Chargement…</p>
+							{/if}
+							{#each teamMembers as m (m.id)}
+								<div class="flex items-center gap-2 text-xs">
+									<span class="text-slate-700 dark:text-slate-200 truncate">{m.email}</span>
+									{#if isTeamAdmin}
+										<select
+											class="ml-auto rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-1.5 py-1 text-[11px]"
+											value={m.role}
+											on:change={(e) => changeMemberRole(m.id, e.currentTarget.value)}
+										>
+											<option value="admin">Admin</option>
+											<option value="member">Membre</option>
+											<option value="readonly">Lecture seule</option>
+										</select>
+										<button
+											type="button"
+											class="text-rose-500 hover:text-rose-400"
+											on:click={() => removeMember(m.id)}>retirer</button
+										>
+									{:else}
+										<span class="ml-auto text-slate-400">{roleLabel(m.role)}</span>
+									{/if}
+								</div>
+							{/each}
+							{#if inviteError}<p class="text-xs text-rose-500">{inviteError}</p>{/if}
+							{#if isTeamAdmin}
+								<div class="flex items-center gap-2 mt-1">
+									<input
+										class="flex-1 field"
+										bind:value={inviteEmail}
+										placeholder="email d'un compte existant"
+									/>
+									<select class="field w-auto" bind:value={inviteRole}>
+										<option value="member">Membre</option>
+										<option value="readonly">Lecture seule</option>
+										<option value="admin">Admin</option>
+									</select>
+									<button type="button" class="btn btn-sm btn-primary" on:click={inviteMember}
+										>Inviter</button
+									>
+								</div>
+							{/if}
 						</div>
 					{/if}
-					{#if profileWebhookSuccess}
-						<div
-							class="text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2"
-						>
-							{profileWebhookSuccess}
-						</div>
-					{/if}
 
-					<div class="flex justify-end pt-1">
-						<button
-							type="submit"
-							class="btn btn-sm btn-primary disabled:opacity-50"
-							disabled={profileWebhookSubmitting}
+					<!-- Créer une équipe -->
+					<div
+						class="flex items-center gap-2 border-t border-slate-200 dark:border-slate-700 pt-3 mt-1"
+					>
+						<input class="flex-1 field" bind:value={newTeamName} placeholder="Créer une équipe…" />
+						<button type="button" class="btn btn-sm btn-secondary" on:click={createTeam}
+							>Créer</button
 						>
-							{profileWebhookSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-						</button>
 					</div>
-				</form>
+					{#if createTeamError}<p class="text-xs text-rose-500">{createTeamError}</p>{/if}
+				</div>
 
 				<!-- Page publique -->
 				<form

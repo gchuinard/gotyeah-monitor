@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import type { CheckEntry } from '$lib/stores/monitors';
+	import { activeRole } from '$lib/stores/teams';
 
 	export let id: number;
 	export let groupId: number | null = null;
@@ -34,6 +35,22 @@
 	export let latencyThresholdMs: number | null = null;
 	export let port: number | null = null;
 	export let inMaintenance = false;
+	export let environment: string | null = null;
+	export let teamId: number | null = null;
+
+	// Lecture seule (rôle readonly dans l'équipe active) : masque l'assignation de groupe.
+	$: readonly = $activeRole === 'readonly';
+
+	function envBadgeClass(env: string): string {
+		const e = env.toLowerCase();
+		if (e === 'prod' || e === 'production')
+			return 'bg-rose-500/15 text-rose-500 border border-rose-500/30';
+		if (e === 'staging' || e === 'preprod' || e === 'recette')
+			return 'bg-sky-500/15 text-sky-500 border border-sky-500/30';
+		if (e === 'dev' || e === 'test')
+			return 'bg-slate-500/15 text-slate-400 border border-slate-500/30';
+		return 'bg-violet-500/15 text-violet-400 border border-violet-500/30';
+	}
 
 	let prevStatus: typeof status;
 	let animationClass = '';
@@ -124,6 +141,10 @@
 						class="px-1.5 py-0.5 text-[10px] rounded-md bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30 shrink-0"
 						>{type}</span
 					>
+					{#if environment}<span
+							class="px-1.5 py-0.5 text-[10px] rounded-md shrink-0 {envBadgeClass(environment)}"
+							>{environment}</span
+						>{/if}
 				</div>
 				<div class="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
 					<span class={`font-medium tabular-nums ${latencyColor(latency)}`}
@@ -144,10 +165,16 @@
 						>🔧 maintenance</span
 					>{/if}
 			</div>
-			<span
-				class="px-2 py-1 text-xs rounded-md bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
-				>{type}</span
-			>
+			<div class="flex items-center gap-2">
+				{#if environment}<span
+						class="px-2 py-0.5 text-[10px] rounded-md {envBadgeClass(environment)}"
+						>{environment}</span
+					>{/if}
+				<span
+					class="px-2 py-1 text-xs rounded-md bg-gotyeah-600/20 text-gotyeah-200 border border-gotyeah-600/30"
+					>{type}</span
+				>
+			</div>
 		</div>
 
 		<div class="flex items-center gap-3 text-sm">
@@ -218,7 +245,7 @@
 		</div>
 	{/if}
 
-	{#if groups.length > 0 && onAssignGroup}
+	{#if groups.length > 0 && onAssignGroup && !readonly}
 		<select
 			class="self-start text-[11px] rounded-md border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-cyan-500"
 			value={groupId == null ? '' : String(groupId)}

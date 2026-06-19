@@ -7,10 +7,14 @@
 	import { groups } from '$lib/stores/groups';
 	import { onMount } from 'svelte';
 	import type { MonitorCardData } from '$lib/stores/monitors';
+	import RecipientsEditor from '$lib/components/RecipientsEditor.svelte';
+	import { activeRole } from '$lib/stores/teams';
 
 	export let monitor: MonitorCardData;
 	export let onClose: () => void;
 	export let onDeleted: () => void;
+	// Lecture seule (rôle readonly dans l'équipe active) : masque les actions d'écriture.
+	$: readonly = $activeRole === 'readonly';
 
 	let mode = 1;
 	let deleting = false;
@@ -180,6 +184,7 @@
 	let editPort: number | null = null;
 	let editGroupId: number | null = null;
 	let editIsPublic = false;
+	let editEnvironment = '';
 	let submitting = false;
 	let editError: string | null = null;
 
@@ -195,6 +200,7 @@
 		editPort = monitor.port;
 		editGroupId = monitor.groupId;
 		editIsPublic = monitor.isPublic;
+		editEnvironment = monitor.environment ?? '';
 		editError = null;
 		editing = true;
 	}
@@ -217,6 +223,7 @@
 					latency_threshold_ms: editLatencyThresholdMs || null,
 					port: editType === 'port' ? editPort : null,
 					group_id: editGroupId == null ? null : Number(editGroupId),
+					environment: editEnvironment.trim() || null,
 					is_public: editIsPublic
 				})
 			});
@@ -404,6 +411,20 @@
 						</select>
 					</label>
 				{/if}
+				<label class="flex flex-col gap-1">
+					<span class="eyebrow">Environnement</span>
+					<input
+						class="field-dark"
+						list="env-presets-edit"
+						bind:value={editEnvironment}
+						placeholder="prod, staging, dev… (optionnel)"
+					/>
+					<datalist id="env-presets-edit">
+						<option value="prod"></option>
+						<option value="staging"></option>
+						<option value="dev"></option>
+					</datalist>
+				</label>
 				{#if editType === 'http'}
 					<div class="grid grid-cols-2 gap-3">
 						<label class="flex flex-col gap-1">
@@ -649,20 +670,31 @@
 												})}</span
 											>
 										</div>
-										<div class="flex items-center gap-2">
-											<button
-												type="button"
-												class={`text-[11px] shrink-0 ${inc.acknowledged_at ? 'text-emerald-400' : 'text-cyan-400 hover:text-cyan-300'}`}
-												on:click={() => ackIncident(inc)}
-												>{inc.acknowledged_at ? '✓ acquitté' : 'Acquitter'}</button
-											>
-											<input
-												class="field-dark flex-1 text-[11px]"
-												placeholder="Post-mortem / note…"
-												bind:value={drafts[inc.id]}
-												on:change={() => savePostmortem(inc)}
-											/>
-										</div>
+										{#if !readonly}
+											<div class="flex items-center gap-2">
+												<button
+													type="button"
+													class={`text-[11px] shrink-0 ${inc.acknowledged_at ? 'text-emerald-400' : 'text-cyan-400 hover:text-cyan-300'}`}
+													on:click={() => ackIncident(inc)}
+													>{inc.acknowledged_at ? '✓ acquitté' : 'Acquitter'}</button
+												>
+												<input
+													class="field-dark flex-1 text-[11px]"
+													placeholder="Post-mortem / note…"
+													bind:value={drafts[inc.id]}
+													on:change={() => savePostmortem(inc)}
+												/>
+											</div>
+										{:else if inc.acknowledged_at || inc.postmortem}
+											<div class="flex items-center gap-2 text-[11px]">
+												{#if inc.acknowledged_at}<span class="text-emerald-400 shrink-0"
+														>✓ acquitté</span
+													>{/if}
+												{#if inc.postmortem}<span class="text-slate-400 truncate"
+														>{inc.postmortem}</span
+													>{/if}
+											</div>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -684,34 +716,57 @@
 												w.end_at
 											).toLocaleString('fr-FR')}</span
 										>
-										<button
-											type="button"
-											class="ml-auto text-rose-400 hover:text-rose-300"
-											on:click={() => deleteMaintenance(w.id)}>✕</button
-										>
+										{#if !readonly}
+											<button
+												type="button"
+												class="ml-auto text-rose-400 hover:text-rose-300"
+												on:click={() => deleteMaintenance(w.id)}>✕</button
+											>
+										{/if}
 									</div>
 								{/each}
 							</div>
 						{/if}
-						<div class="grid grid-cols-2 gap-2">
-							<label class="flex flex-col gap-1"
-								><span class="eyebrow">Début</span>
-								<input type="datetime-local" bind:value={mwStart} class="field-dark" /></label
+						{#if readonly && maintenanceLoaded && maintenanceWindows.length === 0}
+							<p class="text-xs text-slate-500">Aucune maintenance planifiée.</p>
+						{/if}
+						{#if !readonly}
+							<div class="grid grid-cols-2 gap-2">
+								<label class="flex flex-col gap-1"
+									><span class="eyebrow">Début</span>
+									<input type="datetime-local" bind:value={mwStart} class="field-dark" /></label
+								>
+								<label class="flex flex-col gap-1"
+									><span class="eyebrow">Fin</span>
+									<input type="datetime-local" bind:value={mwEnd} class="field-dark" /></label
+								>
+							</div>
+							<input bind:value={mwLabel} placeholder="Libellé (optionnel)" class="field-dark" />
+							{#if mwError}<p class="text-[11px] text-rose-400">{mwError}</p>{/if}
+							<button
+								type="button"
+								class="btn btn-sm btn-secondary self-start"
+								on:click={submitMaintenance}
+								disabled={mwSubmitting || !mwStart || !mwEnd}
+								>{mwSubmitting ? '...' : 'Planifier'}</button
 							>
-							<label class="flex flex-col gap-1"
-								><span class="eyebrow">Fin</span>
-								<input type="datetime-local" bind:value={mwEnd} class="field-dark" /></label
-							>
-						</div>
-						<input bind:value={mwLabel} placeholder="Libellé (optionnel)" class="field-dark" />
-						{#if mwError}<p class="text-[11px] text-rose-400">{mwError}</p>{/if}
-						<button
-							type="button"
-							class="btn btn-sm btn-secondary self-start"
-							on:click={submitMaintenance}
-							disabled={mwSubmitting || !mwStart || !mwEnd}
-							>{mwSubmitting ? '...' : 'Planifier'}</button
-						>
+						{/if}
+					</div>
+
+					<!-- Destinataires d'alerte -->
+					<div class="flex flex-col gap-2 mt-8">
+						<span class="eyebrow">Destinataires d'alerte</span>
+						<p class="text-[11px] text-slate-500 -mt-1">
+							Qui est notifié quand ce monitor change d'état. S'ajoutent aux destinataires du
+							groupe. Sans aucun destinataire (ici ni sur le groupe), les admins de l'équipe sont
+							notifiés.
+						</p>
+						<RecipientsEditor
+							basePath={`/monitors/${monitor.id}`}
+							teamId={monitor.teamId}
+							{readonly}
+							dark={true}
+						/>
 					</div>
 				</div>
 
@@ -854,16 +909,20 @@
 						<span>Dernier check : {formatRelative(monitor.lastCheckedAt)}</span>
 						<span>Créé le : {formatDate(monitor.createdAt)}</span>
 					</div>
-					<div class="flex shrink-0 items-center gap-2">
-						<button class="btn btn-sm btn-primary" on:click={openEdit}> Modifier </button>
-						<button
-							class="btn btn-sm btn-danger disabled:opacity-50"
-							on:click={() => (showConfirmDelete = true)}
-							disabled={deleting}
-						>
-							Supprimer
-						</button>
-					</div>
+					{#if !readonly}
+						<div class="flex shrink-0 items-center gap-2">
+							<button class="btn btn-sm btn-primary" on:click={openEdit}> Modifier </button>
+							<button
+								class="btn btn-sm btn-danger disabled:opacity-50"
+								on:click={() => (showConfirmDelete = true)}
+								disabled={deleting}
+							>
+								Supprimer
+							</button>
+						</div>
+					{:else}
+						<span class="text-[11px] text-slate-500 italic">Lecture seule</span>
+					{/if}
 				</div>
 			{:else}
 				<div class="border-t border-slate-800 px-6 pb-6 pt-4 flex flex-col gap-3">

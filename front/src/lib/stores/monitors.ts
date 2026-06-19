@@ -31,6 +31,8 @@ export type MonitorCardData = {
 	latencyThresholdMs: number | null;
 	port: number | null;
 	groupId: number | null;
+	teamId: number | null;
+	environment: string | null;
 	isPublic: boolean;
 	inMaintenance: boolean;
 	createdAt: string;

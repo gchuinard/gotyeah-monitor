@@ -11,6 +11,7 @@
 	let url = '';
 	let type = 'http';
 	let expectedStatusCode = 200;
+	let environment = '';
 
 	let loading = true;
 	let submitting = false;
@@ -30,6 +31,7 @@
 			url = data.url;
 			type = data.type;
 			expectedStatusCode = data.expected_status_code ?? 200;
+			environment = data.environment ?? '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Erreur inconnue';
 		} finally {
@@ -50,7 +52,8 @@
 					name,
 					url,
 					type,
-					expected_status_code: expectedStatusCode
+					expected_status_code: expectedStatusCode,
+					environment: environment.trim() || null
 				})
 			});
 
@@ -130,6 +133,21 @@
 							class="field tabular-nums"
 							bind:value={expectedStatusCode}
 						/>
+					</label>
+
+					<label class="flex flex-col gap-1">
+						<span class="text-sm text-slate-600 dark:text-slate-300">Environnement</span>
+						<input
+							class="field"
+							list="env-presets-editpage"
+							bind:value={environment}
+							placeholder="prod, staging, dev… (optionnel)"
+						/>
+						<datalist id="env-presets-editpage">
+							<option value="prod"></option>
+							<option value="staging"></option>
+							<option value="dev"></option>
+						</datalist>
 					</label>
 
 					{#if error}
