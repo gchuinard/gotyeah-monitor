@@ -20,6 +20,7 @@
 
 	$: slug = $page.params.slug;
 
+	// Charge la page de statut publique par slug (GET /public/{slug}) : titre + moniteurs publics, gère 404/erreur.
 	onMount(async () => {
 		// fetch direct (endpoint public, sans token) — pas d'apiFetch (qui redirige sur 401).
 		try {

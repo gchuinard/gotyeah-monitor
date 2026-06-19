@@ -52,6 +52,7 @@
 	let editSaving = false;
 	let editError: string | null = null;
 
+	/** Charge tous les utilisateurs et leurs moniteurs (réservé admin) ; affiche un message dédié sur 403. */
 	async function fetchUsers() {
 		loading = true;
 		error = null;
@@ -102,6 +103,7 @@
 		editError = null;
 	}
 
+	/** Enregistre les modifications d'un moniteur (PUT /admin/monitors/{id}) et met à jour la liste locale en place. */
 	async function saveEdit() {
 		if (!editModal) return;
 		editSaving = true;
@@ -131,6 +133,7 @@
 		}
 	}
 
+	/** Supprime le moniteur ou le compte ciblé par la modale (DELETE), met à jour la liste locale ; garde la modale ouverte en cas d'erreur pour réessayer. */
 	async function confirmDelete() {
 		if (!confirmModal) return;
 		const modal = confirmModal;

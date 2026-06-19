@@ -1,12 +1,20 @@
 <script lang="ts">
+	/**
+	 * Barre d'historique de disponibilité : agrège les checks en buckets temporels
+	 * (vert = tout OK, rouge = tout KO, jaune = mixte, gris = pas de données) sur une
+	 * fenêtre choisie par moniteur. La fenêtre et la taille des buckets viennent des
+	 * presets ; le choix est persisté par moniteur (voir `monitorWindowStore`).
+	 */
 	import type { CheckEntry } from '$lib/stores/monitors';
 	import { HISTORY_WINDOW_PRESETS, monitorWindowStore } from '$lib/stores/historyWindow';
 
 	export let history: CheckEntry[] = [];
 	export let monitorId: number;
 
+	// Store de fenêtre dédié à ce moniteur (persiste le choix dans localStorage).
 	const windowStore = monitorWindowStore(monitorId);
 
+	/** Parse une date en forçant l'UTC quand l'horodatage est tz-naïf (suffixe Z manquant). */
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
@@ -36,6 +44,9 @@
 		color: BucketColor;
 	};
 
+	// Découpe la fenêtre courante en intervalles de `bucketMinutes` (du plus ancien au plus
+	// récent) et y répartit les checks ; chaque bucket porte ses compteurs up/down, la latence
+	// moyenne et une couleur dérivée (gris si vide, vert/rouge si uniforme, jaune si mixte).
 	$: buckets = (() => {
 		const bucketMs = preset.bucketMinutes * 60 * 1000;
 		const windowMs = $windowStore * 60 * 60 * 1000;
@@ -64,6 +75,7 @@
 		return result;
 	})();
 
+	// Uptime affiché = part des checks « up » sur l'ensemble des buckets de la fenêtre.
 	$: allChecks = buckets.flatMap((b) => b.checks);
 	$: uptimePct =
 		allChecks.length === 0
@@ -80,6 +92,10 @@
 	} | null = null;
 	let containerEl: HTMLDivElement;
 
+	/**
+	 * Libellé du tooltip d'un bucket, dont le format dépend de sa durée :
+	 * instant précis (≤10 min), plage début→fin (intra-journalier) ou date seule (≥1 j).
+	 */
 	function formatBucketLabel(b: Bucket): string {
 		const start = new Date(b.start);
 		const end = new Date(b.end);
@@ -105,6 +121,11 @@
 		return start.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 	}
 
+	/**
+	 * Prépare le tooltip au survol d'un bucket : compose le détail (nb de checks OK/KO,
+	 * latence moyenne, ou « Offline ») et positionne le tooltip relativement au conteneur.
+	 * Ignore les buckets gris (sans données).
+	 */
 	function onEnter(e: MouseEvent, b: Bucket) {
 		if (b.color === 'gray') return;
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

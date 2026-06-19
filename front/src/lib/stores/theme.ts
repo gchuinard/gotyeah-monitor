@@ -2,6 +2,7 @@ import { writable } from 'svelte/store';
 
 export type Theme = 'light' | 'dark';
 
+/** Résout le thème initial uniquement depuis la préférence stockée (la préférence système est volontairement ignorée), avec repli sur 'light'. */
 function getInitialTheme(): Theme {
 	if (typeof document === 'undefined') {
 		return 'light';
@@ -20,8 +21,10 @@ function getInitialTheme(): Theme {
 
 const initial: Theme = getInitialTheme();
 
+/** Thème courant ('light'/'dark'), persisté en localStorage et appliqué au DOM via la classe `.dark`. */
 export const theme = writable<Theme>(initial);
 
+/** Applique le thème au DOM (classe `.dark` forcée sur <html>) et le persiste en localStorage. */
 function applyTheme(value: Theme) {
 	if (typeof document === 'undefined') return;
 	const root = document.documentElement;

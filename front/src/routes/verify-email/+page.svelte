@@ -8,6 +8,8 @@
 	let pageStatus: 'loading' | 'success' | 'error' = 'loading';
 	let message = '';
 
+	// Au montage : lit le token du fragment d'URL et vérifie l'adresse email
+	// (POST /auth/verify-email) ; le résultat pilote l'affichage success/error.
 	onMount(async () => {
 		const token = getUrlToken();
 		if (!token) {

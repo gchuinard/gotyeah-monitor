@@ -10,6 +10,7 @@
 	let error: string | null = null;
 	let success = false;
 
+	/** Crée un compte (POST /auth/register) ; un email de vérification est envoyé, message de succès générique (anti-énumération). */
 	async function onSubmit() {
 		submitting = true;
 		error = null;

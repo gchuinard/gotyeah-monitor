@@ -1,5 +1,13 @@
 <script lang="ts">
+	/**
+	 * Mini-graphe de latence (courbe lissée + aire dégradée) rendu en SVG.
+	 * Affiche une grille, des labels d'axes (ms / heures) et un tooltip au survol.
+	 * La couleur de la courbe reflète la latence moyenne (vert/jaune/rouge).
+	 */
+
+	/** Valeurs de latence (ms), une par point, dans l'ordre chronologique. */
 	export let values: number[] = [];
+	/** Horodatages ISO alignés sur `values` (même index), pour les labels X et le tooltip. */
 	export let timestamps: string[] = [];
 	export let height = 80;
 
@@ -16,6 +24,7 @@
 
 	$: lineColor = avg < 150 ? '#34d399' : avg < 400 ? '#fbbf24' : '#f87171';
 
+	// Projette chaque valeur en coordonnées SVG (x réparti uniformément, y normalisé sur [min, max]).
 	$: pts = values.map((v, i) => ({
 		x: pad.left + (i / Math.max(values.length - 1, 1)) * plotW,
 		y: pad.top + (1 - (v - min) / range) * plotH,
@@ -23,6 +32,10 @@
 		ts: timestamps[i] ?? null
 	}));
 
+	/**
+	 * Construit le path SVG d'une courbe lissée par des courbes de Bézier cubiques,
+	 * en plaçant les points de contrôle au milieu horizontal de chaque segment.
+	 */
 	function smoothPath(points: { x: number; y: number }[]): string {
 		if (points.length < 2) return '';
 		let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
@@ -45,6 +58,7 @@
 		label: Math.round(max - p * range)
 	}));
 
+	// Échantillonne jusqu'à 5 horodatages répartis sur l'axe X, formatés en heure locale.
 	$: xLabels = (() => {
 		if (!timestamps.length || pts.length < 2) return [];
 		const count = Math.min(5, pts.length);
@@ -66,10 +80,12 @@
 	let svgEl: SVGSVGElement;
 	let hovered: { x: number; y: number; v: number; label: string } | null = null;
 
+	/** Parse une date en forçant l'UTC quand l'horodatage est tz-naïf (suffixe Z manquant). */
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
+	/** Au survol : trouve le point dont le x est le plus proche du curseur et alimente le tooltip. */
 	function onMouseMove(e: MouseEvent) {
 		if (!pts.length) return;
 		const rect = svgEl.getBoundingClientRect();

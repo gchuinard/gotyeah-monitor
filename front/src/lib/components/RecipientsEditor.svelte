@@ -1,4 +1,9 @@
 <script lang="ts">
+	/**
+	 * Éditeur des destinataires d'alerte d'un moniteur ou d'un groupe : liste les
+	 * destinataires (email libre ou membre d'équipe), permet d'en ajouter/retirer.
+	 * Générique via `basePath` (l'entité cible) et `teamId` (pour proposer les membres).
+	 */
 	import { apiFetch } from '$lib/utils/api';
 	import { parseApiError } from '$lib/utils/errors';
 	import { onMount } from 'svelte';
@@ -28,6 +33,10 @@
 
 	const fieldClass = dark ? 'field-dark' : 'field';
 
+	/**
+	 * Charge les destinataires de l'entité et, si `teamId` est fourni, les membres de
+	 * l'équipe (pour la liste déroulante d'ajout). Best-effort : un échec n'affiche rien.
+	 */
 	async function load() {
 		try {
 			const res = await apiFetch(`${basePath}/recipients`);
@@ -49,6 +58,7 @@
 
 	onMount(load);
 
+	/** Ajoute un destinataire par adresse email libre, puis recharge la liste. */
 	async function addEmail() {
 		const email = newEmail.trim();
 		if (!email) return;
@@ -73,6 +83,7 @@
 		}
 	}
 
+	/** Ajoute un destinataire par membre d'équipe sélectionné, puis recharge la liste. */
 	async function addMember() {
 		if (!newMemberId) return;
 		adding = true;
@@ -111,6 +122,7 @@
 		return r.member_email ?? r.email ?? '—';
 	}
 
+	// Membres encore proposables = membres de l'équipe non déjà présents dans les destinataires.
 	$: existingMemberIds = new Set(
 		recipients.filter((r) => r.member_user_id != null).map((r) => r.member_user_id)
 	);

@@ -1,9 +1,16 @@
 <script lang="ts">
+	/**
+	 * Indicateur visuel de robustesse du mot de passe : affiche la liste des
+	 * règles (longueur, majuscule, chiffre, symbole) et leur état de validation.
+	 */
+
 	export let password: string = '';
+	/** Lié en sortie (bind:valid) : vrai uniquement si toutes les règles passent. */
 	export let valid = false;
 
 	let checks = { length: false, uppercase: false, number: false, symbol: false };
 
+	// Recalcule l'état des règles à chaque frappe et met `valid` à jour en conséquence.
 	$: {
 		checks = {
 			length: password.length >= 8,

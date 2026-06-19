@@ -1,3 +1,9 @@
+/**
+ * Transforme une réponse d'erreur HTTP en message utilisateur en français. Extrait le
+ * `detail` du corps (gère le tableau des erreurs 422 de FastAPI), puis le combine à un
+ * message adapté au code de statut (réseau/500/401/403/404/409/422…).
+ * @param context - libellé de l'action en cours, injecté dans le message (ex. 'login').
+ */
 export async function parseApiError(res: Response, context: string): Promise<string> {
 	let detail = '';
 	try {
@@ -45,6 +51,11 @@ export async function parseApiError(res: Response, context: string): Promise<str
 	return detail || `Erreur inattendue (${context}, HTTP ${res.status}).`;
 }
 
+/**
+ * Transforme une exception levée par `fetch` (avant toute réponse) en message en français :
+ * détecte l'échec réseau (TypeError « fetch »), sinon renvoie le message de l'erreur.
+ * @param context - libellé de l'action en cours, injecté dans le message.
+ */
 export function parseNetworkError(e: unknown, context: string): string {
 	if (e instanceof TypeError && e.message.includes('fetch')) {
 		return `Impossible de contacter le serveur (${context}). Vérifiez votre connexion et que l'API est démarrée.`;

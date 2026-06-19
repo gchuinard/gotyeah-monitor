@@ -6,6 +6,7 @@ export type CollapseMap = Record<string, boolean>;
 
 const STORAGE_KEY = 'groupCollapse';
 
+/** Lit la map d'état replié depuis localStorage, en filtrant les valeurs non booléennes ; renvoie {} si absent ou corrompu. */
 function load(): CollapseMap {
 	if (typeof window === 'undefined') return {};
 	const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -23,6 +24,7 @@ function load(): CollapseMap {
 	}
 }
 
+/** État replié/déplié de chaque groupe du dashboard, persisté en localStorage (clé `groupCollapse`). */
 export const groupCollapse = writable<CollapseMap>(load());
 
 if (typeof window !== 'undefined') {

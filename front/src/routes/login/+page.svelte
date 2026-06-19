@@ -12,6 +12,7 @@
 	let submitting = false;
 	let error: string | null = null;
 
+	/** Authentifie (form-urlencoded /auth/login), récupère le profil via /auth/me, stocke le JWT puis redirige vers le dashboard. */
 	async function onSubmit() {
 		submitting = true;
 		error = null;

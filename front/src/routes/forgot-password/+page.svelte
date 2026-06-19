@@ -9,6 +9,7 @@
 	let error: string | null = null;
 	let success = false;
 
+	/** Demande un lien de réinitialisation (POST /auth/forgot-password) ; succès affiché de façon générique (anti-énumération). */
 	async function onSubmit() {
 		submitting = true;
 		error = null;

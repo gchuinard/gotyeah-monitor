@@ -17,6 +17,7 @@
 	let submitting = false;
 	let error: string | null = null;
 
+	/** Charge le moniteur à éditer (GET /monitors/{id}) et pré-remplit le formulaire. */
 	async function loadMonitor() {
 		loading = true;
 		error = null;
@@ -41,6 +42,7 @@
 
 	onMount(loadMonitor);
 
+	/** Enregistre les modifications du moniteur (PUT /monitors/{id}) puis redirige vers le dashboard. */
 	async function onSubmit() {
 		submitting = true;
 		error = null;

@@ -16,6 +16,7 @@
 
 	onMount(loadTeams);
 
+	/** Crée un moniteur (POST /monitors) dans l'équipe active puis redirige vers le dashboard ; refuse s'il n'y a pas d'équipe active. */
 	async function onSubmit() {
 		const teamId = get(activeTeamId);
 		if (teamId == null) {

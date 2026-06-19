@@ -12,6 +12,11 @@ export const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 
 const VALID_MODES = new Set<SortMode>(['manual', 'name', 'status', 'latency', 'uptime']);
 
+/**
+ * Crée un store writable hydraté depuis localStorage et qui s'y resynchronise à chaque
+ * changement. `validate` rejette une valeur stockée incompatible (on garde alors `initial`),
+ * ce qui protège des données corrompues ou d'un ancien format.
+ */
 function persisted<T>(key: string, initial: T, validate?: (v: unknown) => v is T) {
 	let start = initial;
 	if (typeof window !== 'undefined') {

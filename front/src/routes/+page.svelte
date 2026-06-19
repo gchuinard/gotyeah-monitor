@@ -95,6 +95,7 @@
 	// Filtre par environnement sur le dashboard.
 	let envFilter = '';
 
+	/** Ouvre le modal d'ajout en réinitialisant le formulaire (groupId pré-rempli si l'ajout part d'un groupe). */
 	function openAdd(groupId: number | null = null) {
 		addName = '';
 		addUrl = '';
@@ -112,6 +113,7 @@
 		showAdd = true;
 	}
 
+	/** Crée un moniteur (POST /monitors) dans l'équipe active puis rafraîchit la liste ; refuse s'il n'y a pas d'équipe active. */
 	async function submitAdd() {
 		const teamId = get(activeTeamId);
 		if (teamId == null) {
@@ -157,6 +159,7 @@
 	let groupActionError: string | null = null;
 	let groupRecipientsOpen: number | null = null;
 
+	/** Réassigne un moniteur à un groupe via un PUT complet (l'API attend tous les champs) puis recharge la liste. */
 	async function assignGroup(monitorId, groupId) {
 		const mon = $monitors.find((x) => x.id === monitorId);
 		if (!mon) return;
@@ -185,6 +188,7 @@
 		}
 	}
 
+	/** Crée un groupe dans l'équipe active ; ignore un nom vide et expose l'erreur API dans groupActionError. */
 	async function createGroup() {
 		const name = newGroupName.trim();
 		if (!name) return;
@@ -211,6 +215,7 @@
 		}
 	}
 
+	/** Renomme un groupe (PUT) puis recharge la liste des groupes. */
 	async function renameGroup(id: number, name: string) {
 		const n = name.trim();
 		if (!n) return;
@@ -226,6 +231,7 @@
 		}
 	}
 
+	/** Supprime un groupe ; le FK ON DELETE SET NULL dégroupe ses moniteurs, d'où le rechargement des deux listes. */
 	async function deleteGroup(id: number) {
 		try {
 			await apiFetch(`/groups/${id}`, { method: 'DELETE' });
@@ -271,6 +277,7 @@
 	function statusRank(s: string): number {
 		return s === 'down' ? 0 : s === 'checking' ? 1 : 2;
 	}
+	/** Trie les cards selon le mode choisi : ordre manuel persisté, ou tri par nom, statut, latence ou uptime. */
 	function sortCards(items: Card[], mode: SortMode, sectionKey: string): Card[] {
 		if (mode === 'manual') return applyManualOrder(items, $monitorOrder[sectionKey] ?? []);
 		const arr = [...items];
@@ -283,6 +290,7 @@
 		else if (mode === 'uptime') arr.sort((a, b) => (a.uptime24h ?? 101) - (b.uptime24h ?? 101));
 		return arr;
 	}
+	/** Rang d'un groupe pour le tri automatique, dérivé du pire (statut/uptime) ou du meilleur (latence) de ses moniteurs. */
 	function groupRank(items: Card[], mode: SortMode): number {
 		if (!items.length) return mode === 'status' ? 2 : mode === 'uptime' ? 101 : 0;
 		if (mode === 'status') return Math.min(...items.map((m) => statusRank(m.status)));
@@ -323,6 +331,7 @@
 
 	$: dragDisabled = $sortMode !== 'manual';
 
+	/** Mémorise l'ordre manuel des cards d'une section (liste d'ids) dans le store monitorOrder. */
 	function persistCardOrder(key: string, items: Card[]) {
 		monitorOrder.update((m) => ({ ...m, [key]: items.map((c) => c.id) }));
 	}
@@ -331,6 +340,8 @@
 			ungroupedSection = { ...ungroupedSection, items };
 		else realSections = realSections.map((s) => (s.key === key ? { ...s, items } : s));
 	}
+	// Handlers svelte-dnd-action : `consider` met à jour la vue pendant le glisser (et lève `dragging`
+	// pour figer la re-synchronisation réactive), `finalize` fige le résultat et persiste l'ordre.
 	function flatConsider(e: CustomEvent) {
 		dragging = true;
 		flatCards = e.detail.items;
@@ -408,6 +419,7 @@
 	let profileNewTokenRaw = '';
 	let profileTokenError: string | null = null;
 
+	/** Ouvre le modal Profil : réinitialise tous les champs puis charge la page publique et les tokens d'API. */
 	async function openProfile() {
 		profileNewEmail = '';
 		profileEmailError = null;
@@ -429,6 +441,7 @@
 		void loadApiTokens();
 	}
 
+	/** Charge la liste des tokens d'API de l'utilisateur (best-effort, silencieux en cas d'échec). */
 	async function loadApiTokens() {
 		try {
 			const res = await apiFetch('/api-tokens');
@@ -438,6 +451,7 @@
 		}
 	}
 
+	/** Crée un token d'API ; le secret en clair (created.token) n'est renvoyé qu'une seule fois, conservé dans profileNewTokenRaw. */
 	async function createApiToken() {
 		if (!profileNewTokenName.trim()) return;
 		profileTokenError = null;
@@ -460,6 +474,7 @@
 		}
 	}
 
+	/** Révoque un token d'API (DELETE, tolère un 204) puis recharge la liste. */
 	async function deleteApiToken(id: number) {
 		profileTokenError = null;
 		try {
@@ -474,6 +489,7 @@
 		}
 	}
 
+	/** Charge la config de la page de statut publique (slug + titre) si elle existe. */
 	async function loadStatusPage() {
 		try {
 			const res = await apiFetch('/status-page');
@@ -489,6 +505,7 @@
 		}
 	}
 
+	/** Enregistre le slug et le titre de la page de statut publique (PUT /status-page). */
 	async function saveStatusPage() {
 		profileStatusPageSubmitting = true;
 		profileStatusPageError = null;
@@ -565,6 +582,7 @@
 		return r === 'admin' ? 'Admin' : r === 'member' ? 'Membre' : 'Lecture seule';
 	}
 
+	/** Charge la gestion de l'équipe active : nom, webhook, liste des membres et préférence email de l'utilisateur courant. */
 	async function loadTeamManagement() {
 		teamMembers = [];
 		teamMembersLoaded = false;
@@ -594,6 +612,7 @@
 		}
 	}
 
+	/** Enregistre le nom et le webhook d'alerte de l'équipe (PUT /teams/{id}) puis recharge les équipes. */
 	async function saveTeamSettings() {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -623,6 +642,7 @@
 		}
 	}
 
+	/** Active/désactive la réception des emails d'alerte pour l'utilisateur courant dans cette équipe (PATCH /teams/{id}/me). */
 	async function saveMyEmailPref() {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -639,6 +659,7 @@
 		}
 	}
 
+	/** Invite un membre par email avec un rôle (POST), puis recharge la gestion et la liste des équipes. */
 	async function inviteMember() {
 		const t = get(activeTeam);
 		if (!t || !inviteEmail.trim()) return;
@@ -662,6 +683,7 @@
 		}
 	}
 
+	/** Change le rôle d'un membre (PATCH) puis recharge la gestion et la liste des équipes. */
 	async function changeMemberRole(memberId: number, role: string) {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -680,6 +702,7 @@
 		}
 	}
 
+	/** Retire un membre de l'équipe (DELETE, tolère un 204) puis recharge. */
 	async function removeMember(memberId: number) {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -697,6 +720,7 @@
 		}
 	}
 
+	/** Crée un nouvel espace/équipe, le définit comme actif puis charge sa gestion. */
 	async function createTeam() {
 		const name = newTeamName.trim();
 		if (!name) return;
@@ -733,6 +757,7 @@
 	// On peut supprimer si admin, espace pas déjà planifié, et il reste un AUTRE espace actif.
 	$: canDeleteActiveTeam = isTeamAdmin && !activeTeamScheduled && activeTeamCount > 1;
 
+	/** Date de purge définitive (planification + délai de grâce), formatée en français pour l'affichage. */
 	function teamPurgeDate(scheduledAt: string): string {
 		const d = new Date(new Date(scheduledAt).getTime() + TEAM_DELETION_GRACE_DAYS * 86400000);
 		return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -744,6 +769,7 @@
 		confirmDeleteTeam = true;
 	}
 
+	/** Planifie la suppression différée de l'espace (DELETE) puis bascule sur un autre espace encore actif si nécessaire. */
 	async function scheduleDeleteTeam() {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -770,6 +796,7 @@
 		}
 	}
 
+	/** Réactive un espace dont la suppression était planifiée (POST /teams/{id}/restore). */
 	async function restoreActiveTeam() {
 		const t = get(activeTeam);
 		if (!t) return;
@@ -784,6 +811,7 @@
 		}
 	}
 
+	/** Demande un changement d'email (POST /auth/change-email) : un lien de confirmation est envoyé, le message renvoyé est générique (anti-énumération). */
 	async function submitEmailChange() {
 		profileEmailSubmitting = true;
 		profileEmailError = null;
@@ -808,6 +836,7 @@
 		}
 	}
 
+	/** Supprime définitivement le compte courant (DELETE /auth/me), purge la session locale et redirige vers /login. */
 	async function deleteAccount() {
 		profileDeleting = true;
 		try {
@@ -822,6 +851,7 @@
 		}
 	}
 
+	/** Change le mot de passe du compte courant (PUT /auth/me). */
 	async function savePassword() {
 		profilePasswordSubmitting = true;
 		profilePasswordError = null;
@@ -850,6 +880,7 @@
 		goto('/login');
 	}
 
+	/** Récupère l'historique des checks d'un moniteur ; renvoie [] en cas d'échec (best-effort, non bloquant). */
 	async function fetchHistory(monitorId: number, signal?: AbortSignal): Promise<CheckEntry[]> {
 		try {
 			const res = await apiFetch(`/monitors/${monitorId}/history`, { signal });
@@ -863,6 +894,10 @@
 	// Annule un rafraîchissement en cours si un nouveau démarre (évite les courses).
 	let monitorsAbort: AbortController | null = null;
 
+	/**
+	 * Recharge les moniteurs de l'équipe active puis leurs historiques en parallèle, et alimente le store `monitors`.
+	 * Annule le rafraîchissement précédent via AbortController (évite les courses) ; redirige vers /login sans token.
+	 */
 	async function fetchMonitors() {
 		monitorsAbort?.abort();
 		const controller = new AbortController();
@@ -935,6 +970,7 @@
 		}
 	}
 
+	/** Vérifie si l'utilisateur courant est administrateur (best-effort) pour afficher le badge Admin. */
 	async function checkAdmin() {
 		if (!authState?.token) return;
 		try {

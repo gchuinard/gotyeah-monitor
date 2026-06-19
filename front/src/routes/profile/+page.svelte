@@ -28,6 +28,7 @@
 		}
 	});
 
+	/** Met à jour le profil (PUT /auth/me) en n'envoyant que les champs modifiés (email et/ou mot de passe) puis rafraîchit le store auth. */
 	async function onSubmit() {
 		if (!canSubmit) return;
 		submitting = true;

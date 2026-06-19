@@ -1,4 +1,10 @@
 <script lang="ts">
+	/**
+	 * Modale de détail d'un moniteur : stats (statut/latence/HTTP/SSL), SLA mensuel,
+	 * journal d'incidents (acquittement + post-mortem), maintenances planifiées,
+	 * destinataires d'alerte, graphes latence/historique, plus le formulaire d'édition
+	 * et la suppression confirmée. En lecture seule, les actions d'écriture sont masquées.
+	 */
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { apiFetch } from '$lib/utils/api';
@@ -45,6 +51,7 @@
 	let mwSubmitting = false;
 	let mwError: string | null = null;
 
+	/** Charge les incidents et initialise les brouillons de post-mortem éditables (un par incident). */
 	async function loadIncidents() {
 		try {
 			const res = await apiFetch(`/monitors/${monitor.id}/incidents`);
@@ -59,6 +66,7 @@
 		}
 	}
 
+	/** Bascule l'état d'acquittement d'un incident et réaffecte le tableau pour forcer le rendu. */
 	async function ackIncident(inc: IncidentEntry) {
 		try {
 			const res = await apiFetch(`/monitors/${monitor.id}/incidents/${inc.id}`, {
@@ -76,6 +84,7 @@
 		}
 	}
 
+	/** Enregistre la note de post-mortem saisie (brouillon) pour un incident. */
 	async function savePostmortem(inc: IncidentEntry) {
 		try {
 			await apiFetch(`/monitors/${monitor.id}/incidents/${inc.id}`, {
@@ -111,6 +120,7 @@
 		}
 	}
 
+	/** Crée une fenêtre de maintenance ; convertit les `datetime-local` saisis en ISO UTC. */
 	async function submitMaintenance() {
 		if (!mwStart || !mwEnd) return;
 		mwSubmitting = true;
@@ -160,6 +170,10 @@
 		loadMaintenance();
 	});
 
+	/**
+	 * Durée d'un incident formatée de façon adaptative (min, « 1h05 », « 2j 3h »).
+	 * Pour un incident encore ouvert (`ended_at` null), mesure jusqu'à maintenant.
+	 */
 	function incidentDuration(inc: IncidentEntry): string {
 		const start = toUtcDate(inc.started_at).getTime();
 		const end = inc.ended_at ? toUtcDate(inc.ended_at).getTime() : Date.now();
@@ -188,6 +202,7 @@
 	let submitting = false;
 	let editError: string | null = null;
 
+	/** Pré-remplit le formulaire d'édition depuis le moniteur courant et bascule en mode édition. */
 	function openEdit() {
 		editName = monitor.name;
 		editUrl = monitor.url;
@@ -205,6 +220,11 @@
 		editing = true;
 	}
 
+	/**
+	 * Enregistre les modifications (PUT) puis rafraîchit la liste via `onDeleted`.
+	 * Certains champs sont conditionnés au type : `keyword` seulement en HTTP,
+	 * `port` seulement en port ; les champs vides sont normalisés à null.
+	 */
 	async function saveEdit() {
 		submitting = true;
 		editError = null;
@@ -241,10 +261,12 @@
 		.map((c) => c.latency_ms)
 		.filter((v): v is number => v !== null);
 
+	/** Parse une date en forçant l'UTC quand l'horodatage est tz-naïf (suffixe Z manquant). */
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
+	/** Formate une date en durée relative concise (« il y a 5 min », « il y a 2 h »…). */
 	function formatRelative(dateStr: string | null): string {
 		if (!dateStr) return 'Jamais vérifié';
 		const d = toUtcDate(dateStr);
@@ -264,6 +286,7 @@
 		return Number.isNaN(d.getTime()) ? 'Inconnu' : d.toLocaleString();
 	}
 
+	/** Couleur de la latence : vert < 150 ms, jaune < 400 ms, rouge au-delà. */
 	function latencyColor(lat: number | null) {
 		if (lat === null) return 'text-gray-400';
 		if (lat < 150) return 'text-emerald-400';
@@ -271,6 +294,10 @@
 		return 'text-red-500';
 	}
 
+	/**
+	 * État du certificat SSL à partir de sa date d'expiration : libellé (« Expiré » /
+	 * « Nj restants ») et couleur dégradée selon l'urgence (<0, <14j, <30j, ok).
+	 */
 	function sslStatus(expiryStr: string | null): { label: string; color: string } {
 		if (!expiryStr) return { label: 'N/A', color: 'text-slate-400' };
 		const daysLeft = Math.ceil((toUtcDate(expiryStr).getTime() - Date.now()) / 86400000);

@@ -38,4 +38,5 @@ export type MonitorCardData = {
 	createdAt: string;
 };
 
+/** Liste des monitors affichés sur le dashboard, rechargée depuis l'API (non persistée). */
 export const monitors = writable<MonitorCardData[]>([]);

@@ -24,6 +24,7 @@
 		if (!token) invalidLink = true;
 	});
 
+	/** Réinitialise le mot de passe via le token du lien (POST /auth/reset-password) puis redirige vers /login après 2 s. */
 	async function onSubmit() {
 		if (!canSubmit) return;
 		submitting = true;

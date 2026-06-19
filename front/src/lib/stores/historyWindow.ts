@@ -2,6 +2,10 @@ import { writable, type Writable } from 'svelte/store';
 
 export type HistoryWindowPreset = { value: number; label: string; bucketMinutes: number };
 
+/**
+ * Fenêtres d'historique sélectionnables. `bucketMinutes` règle l'agrégation des barres
+ * du StatusBar : plus la fenêtre est large, plus les buckets sont gros.
+ */
 export const HISTORY_WINDOW_PRESETS: HistoryWindowPreset[] = [
 	{ value: 1, label: '1h', bucketMinutes: 10 },
 	{ value: 2, label: '2h', bucketMinutes: 10 },
@@ -20,6 +24,7 @@ const VALID_VALUES = new Set(HISTORY_WINDOW_PRESETS.map((p) => p.value));
 
 type WindowMap = Record<string, number>;
 
+/** Lit la map {monitorId: heures} depuis localStorage, en ne gardant que les valeurs de preset valides ; renvoie {} si absent/corrompu. */
 function load(): WindowMap {
 	if (typeof window === 'undefined') return {};
 	const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -45,6 +50,11 @@ if (typeof window !== 'undefined') {
 	});
 }
 
+/**
+ * Renvoie un store writable dédié à un monitor : une vue sur la map globale persistée,
+ * exposée comme une simple valeur (le nombre d'heures). Lit/écrit l'entrée du monitor,
+ * en repliant sur `DEFAULT_HOURS` et en ignorant les valeurs hors presets.
+ */
 export function monitorWindowStore(monitorId: number | string): Writable<number> {
 	const key = String(monitorId);
 	return {

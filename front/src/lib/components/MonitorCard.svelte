@@ -1,4 +1,9 @@
 <script lang="ts">
+	/**
+	 * Carte d'un moniteur sur le dashboard : statut, latence, uptime, badges
+	 * (type, environnement, maintenance), lien et barre d'historique. Existe en
+	 * version `compact` et pleine ; flashe brièvement à chaque changement de statut.
+	 */
 	import { onMount } from 'svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import type { CheckEntry } from '$lib/stores/monitors';
@@ -41,6 +46,10 @@
 	// Lecture seule (rôle readonly dans l'équipe active) : masque l'assignation de groupe.
 	$: readonly = $activeRole === 'readonly';
 
+	/**
+	 * Classes Tailwind du badge d'environnement selon le nom (rouge pour prod,
+	 * bleu pour staging/recette, gris pour dev/test, violet par défaut).
+	 */
 	function envBadgeClass(env: string): string {
 		const e = env.toLowerCase();
 		if (e === 'prod' || e === 'production')
@@ -77,10 +86,12 @@
 
 	const statusIcon = { up: '🟢', down: '🔴', checking: '⏳' };
 
+	/** Parse une date en forçant l'UTC quand l'horodatage est tz-naïf (suffixe Z manquant). */
 	function toUtcDate(s: string): Date {
 		return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z');
 	}
 
+	/** Formate une date en durée relative concise (« il y a 5 min », « il y a 2 h »…). */
 	function formatRelative(dateStr: string | null): string {
 		if (!dateStr) return 'Jamais vérifié';
 		const d = toUtcDate(dateStr);
@@ -94,6 +105,7 @@
 		return `il y a ${Math.round(h / 24)} j`;
 	}
 
+	/** Couleur de la latence : vert < 150 ms, jaune < 400 ms, rouge au-delà. */
 	function latencyColor(lat: number | null) {
 		if (lat === null) return 'text-gray-400';
 		if (lat < 150) return 'text-emerald-400';
@@ -101,6 +113,7 @@
 		return 'text-red-500';
 	}
 
+	/** Couleur de l'uptime : vert ≥ 99.5 %, jaune ≥ 95 %, rouge en dessous. */
 	function uptimeColor(pct: number) {
 		if (pct >= 99.5) return 'text-emerald-400';
 		if (pct >= 95) return 'text-yellow-400';

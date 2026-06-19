@@ -26,6 +26,7 @@ if (stored) {
 	}
 }
 
+/** État d'authentification (JWT + user), hydraté depuis et persisté vers localStorage (clé `auth`). */
 export const auth = writable<AuthState>(initial);
 
 auth.subscribe((value) => {
