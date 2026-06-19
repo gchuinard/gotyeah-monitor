@@ -78,6 +78,9 @@ HISTORY_RETENTION_DAYS = 7
 # Les incidents (clos) sont conservés bien plus longtemps que les checks (historique
 # long terme), mais bornés pour éviter une croissance illimitée de la table.
 INCIDENT_RETENTION_DAYS = 90
+# Suppression différée d'équipe : période de grâce (désactivée + réactivable) avant
+# purge définitive. Doit rester cohérent avec le texte affiché côté frontend.
+TEAM_DELETION_GRACE_DAYS = 7
 MAX_CONCURRENT_CHECKS = 10
 # La boucle est considérée "bloquée" si aucun cycle n'a abouti depuis 3 intervalles.
 LOOP_STALE_AFTER_SECONDS = CHECK_INTERVAL_SECONDS * 3
@@ -283,6 +286,28 @@ async def _run_retention() -> None:
         logger.exception("Échec du nettoyage de rétention")
 
 
+async def _run_team_purge(now: datetime) -> None:
+    """Purge DÉFINITIVE des équipes en suppression différée dont la période de grâce est
+    écoulée (cascade : monitors, groupes, membres, destinataires). Transaction dédiée."""
+    cutoff = now - timedelta(days=TEAM_DELETION_GRACE_DAYS)
+    try:
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(
+                select(models.Team).where(
+                    models.Team.deletion_scheduled_at.is_not(None),
+                    models.Team.deletion_scheduled_at < cutoff,
+                )
+            )
+            teams = list(res.scalars().all())
+            for team in teams:
+                await session.delete(team)
+            if teams:
+                await session.commit()
+                logger.info("Purge de %d équipe(s) en suppression différée", len(teams))
+    except Exception:
+        logger.exception("Échec de la purge des équipes en suppression différée")
+
+
 async def _run_rollup(now: datetime) -> None:
     """Agrège les jours COMPLETS récents dans monitor_uptime_daily (delete+insert
     idempotent), AVANT que la rétention 7j ne purge monitor_checks. Le jour courant
@@ -356,7 +381,13 @@ async def _run_one_cycle(client: httpx.AsyncClient) -> None:
 
             now = datetime.now(timezone.utc)
             # Intervalle par monitor : on ne sonde que les monitors "dus" ce tick.
-            due = [m for m in all_monitors if _is_due(m, now)]
+            # Les équipes en suppression différée sont désactivées (monitoring suspendu).
+            due = [
+                m
+                for m in all_monitors
+                if _is_due(m, now)
+                and not (m.team is not None and m.team.deletion_scheduled_at is not None)
+            ]
             if not due:
                 return
 
@@ -416,6 +447,7 @@ async def monitor_loop() -> None:
                 # Rétention : cadence lente, pas à chaque tick de 60s.
                 if last_retention is None or mono - last_retention >= RETENTION_INTERVAL_SECONDS:
                     await _run_retention()
+                    await _run_team_purge(datetime.now(timezone.utc))
                     last_retention = mono
                 await _run_one_cycle(client)
                 # Liveness : le tick a abouti (même si aucun monitor n'était dû). On

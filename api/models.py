@@ -54,13 +54,22 @@ class Team(Base):
     # Canal d'alerte optionnel de l'équipe : Discord / Slack / ntfy / générique.
     alert_webhook_url = Column(String(512), nullable=True)
     alert_webhook_kind = Column(String(20), nullable=True)
+    # Suppression différée : quand renseigné, l'équipe est "désactivée" (monitoring
+    # suspendu) et sera purgée TEAM_DELETION_GRACE_DAYS après cette date. NULL = active.
+    # Réactivable tant que la purge n'a pas eu lieu (on remet NULL).
+    deletion_scheduled_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
-    monitors = relationship("Monitor", back_populates="team")
-    monitor_groups = relationship("MonitorGroup", back_populates="team")
+    # passive_deletes=True : la suppression d'une équipe s'appuie sur le ON DELETE CASCADE
+    # de la BDD (monitors/groupes/membres + leurs enfants) plutôt que de laisser l'ORM
+    # dissocier les enfants en mettant team_id à NULL.
+    members = relationship(
+        "TeamMember", back_populates="team", cascade="all, delete-orphan", passive_deletes=True
+    )
+    monitors = relationship("Monitor", back_populates="team", passive_deletes=True)
+    monitor_groups = relationship("MonitorGroup", back_populates="team", passive_deletes=True)
 
 
 class TeamMember(Base):

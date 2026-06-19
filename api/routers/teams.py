@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,6 +22,7 @@ def _team_read(team: models.Team, role: str, member_count: int) -> schemas.TeamR
         name=team.name,
         alert_webhook_url=team.alert_webhook_url,
         alert_webhook_kind=team.alert_webhook_kind,
+        deletion_scheduled_at=team.deletion_scheduled_at,
         created_at=team.created_at,
         role=role,
         member_count=member_count,
@@ -109,18 +111,54 @@ async def update_team(
     return _team_read(team, member.role, await _member_count(db, team_id))
 
 
-@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_team(
+@router.delete("/{team_id}", response_model=schemas.TeamRead)
+async def schedule_delete_team(
     team_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
-) -> None:
-    await team_access.require_team(db, team_id, current_user, "admin")
+) -> schemas.TeamRead:
+    """Suppression DIFFÉRÉE : on ne supprime pas tout de suite. L'équipe est marquée
+    pour suppression (désactivée, monitoring suspendu) et sera purgée après la période
+    de grâce par la boucle. Réactivable d'ici là via /restore. Refus si c'est le dernier
+    espace ACTIF de l'utilisateur (il doit toujours garder un espace utilisable)."""
+    member = await team_access.require_team(db, team_id, current_user, "admin")
+    # Garde "dernier espace actif" : il faut au moins un AUTRE espace non planifié.
+    res = await db.execute(
+        select(func.count())
+        .select_from(models.TeamMember)
+        .join(models.Team, models.Team.id == models.TeamMember.team_id)
+        .where(
+            models.TeamMember.user_id == current_user.id,
+            models.Team.id != team_id,
+            models.Team.deletion_scheduled_at.is_(None),
+        )
+    )
+    if int(res.scalar_one()) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Impossible de supprimer votre dernier espace actif. Créez-en un autre d'abord.",
+        )
     team = await db.get(models.Team, team_id)
-    # Cascade : monitors, groupes et membres de l'équipe sont supprimés (FK CASCADE).
-    await db.delete(team)
+    if team.deletion_scheduled_at is None:
+        team.deletion_scheduled_at = datetime.now(timezone.utc)
     await db.commit()
-    return None
+    await db.refresh(team)
+    return _team_read(team, member.role, await _member_count(db, team_id))
+
+
+@router.post("/{team_id}/restore", response_model=schemas.TeamRead)
+async def restore_team(
+    team_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> schemas.TeamRead:
+    """Annule une suppression différée (réactive l'équipe)."""
+    member = await team_access.require_team(db, team_id, current_user, "admin")
+    team = await db.get(models.Team, team_id)
+    team.deletion_scheduled_at = None
+    await db.commit()
+    await db.refresh(team)
+    return _team_read(team, member.role, await _member_count(db, team_id))
 
 
 # ── Membres ───────────────────────────────────────────────────────────────────

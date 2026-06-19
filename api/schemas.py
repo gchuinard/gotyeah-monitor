@@ -152,6 +152,7 @@ class TeamRead(TeamBase):
     id: int
     alert_webhook_url: Optional[str] = None
     alert_webhook_kind: Optional[str] = None
+    deletion_scheduled_at: Optional[datetime] = None  # None = active ; sinon en suppression différée
     created_at: datetime
     # Renseignés au runtime par le routeur (pas des colonnes) :
     role: Optional[str] = None  # rôle de l'utilisateur courant dans cette équipe
