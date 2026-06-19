@@ -34,9 +34,62 @@ class User(Base):
     monitor_groups = relationship("MonitorGroup", back_populates="user", cascade="all, delete-orphan")
     status_page = relationship("StatusPage", back_populates="user", uselist=False, cascade="all, delete-orphan")
     api_tokens = relationship("ApiToken", back_populates="user", cascade="all, delete-orphan")
+    # Appartenances aux équipes (multi-équipe). L'autorité d'ownership des ressources
+    # passe par l'équipe ; alert_email_enabled/webhook ci-dessus restent en base (legacy)
+    # mais ne sont plus l'autorité : le flag email est désormais par appartenance.
+    team_memberships = relationship("TeamMember", back_populates="user", cascade="all, delete-orphan")
     email_verifications = relationship("EmailVerification", back_populates="user", cascade="all, delete-orphan")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
     email_change_requests = relationship("EmailChangeRequest", back_populates="user", cascade="all, delete-orphan")
+
+
+class Team(Base):
+    # Espace partagé : propriétaire des monitors/groupes/page de statut. Chaque user a
+    # au moins son équipe personnelle (créée au register). Le webhook d'alerte est
+    # désormais au niveau équipe (était par-user).
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    # Canal d'alerte optionnel de l'équipe : Discord / Slack / ntfy / générique.
+    alert_webhook_url = Column(String(512), nullable=True)
+    alert_webhook_kind = Column(String(20), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
+    monitors = relationship("Monitor", back_populates="team")
+    monitor_groups = relationship("MonitorGroup", back_populates="team")
+
+
+class TeamMember(Base):
+    # Appartenance d'un user à une équipe, avec rôle. Une équipe garde toujours >=1 admin
+    # (vérifié applicativement). 'admin' = propriétaire (CRUD + gestion membres + settings),
+    # 'member' = CRUD ressources sans gestion d'équipe, 'readonly' = lecture seule.
+    __tablename__ = "team_members"
+    __table_args__ = (
+        UniqueConstraint("team_id", "user_id", name="uq_team_members_team_user"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(
+        Enum("admin", "member", "readonly", name="team_role"),
+        nullable=False,
+        default="member",
+        server_default="member",
+    )
+    # Coupe les alertes email pour CE membre dans CETTE équipe (le webhook équipe et les
+    # emails libres ne sont pas affectés). Remplace l'ancien User.alert_email_enabled.
+    alert_email_enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    team = relationship("Team", back_populates="members")
+    user = relationship("User", back_populates="team_memberships")
 
 
 class Monitor(Base):
@@ -62,6 +115,8 @@ class Monitor(Base):
     keyword_mode = Column(String(10), nullable=False, default="present", server_default="present")  # present|absent
     latency_threshold_ms = Column(Integer, nullable=True)  # alerte si latence au-dessus (None = off)
     port = Column(Integer, nullable=True)  # cible TCP pour le type 'port'
+    # Étiquette d'environnement (prod/staging/dev ou libre) : classement + filtre + badge.
+    environment = Column(String(50), nullable=True)
     last_status_code = Column(Integer, nullable=True)
     last_latency_ms = Column(Integer, nullable=True)
     last_checked_at = Column(DateTime(timezone=True), nullable=True)
@@ -76,8 +131,15 @@ class Monitor(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    # user_id : créateur (audit/legacy). L'autorité d'ownership est désormais team_id.
+    # SET NULL (migration 0022) : supprimer le créateur ne supprime PAS le monitor, qui
+    # appartient à l'équipe (potentiellement partagée).
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     user = relationship("User", back_populates="monitors")
+    # Équipe propriétaire (autorité d'autorisation). Nullable le temps du backfill, mais
+    # toujours renseigné en pratique après migration 0019.
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True, index=True)
+    team = relationship("Team", back_populates="monitors")
     # Groupe d'appartenance : SET NULL -> supprimer un groupe dégroupe ses monitors
     # (ne les supprime pas).
     group_id = Column(Integer, ForeignKey("monitor_groups.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -87,6 +149,12 @@ class Monitor(Base):
     checks = relationship("MonitorCheck", back_populates="monitor", cascade="all, delete-orphan")
     incidents = relationship("Incident", back_populates="monitor", cascade="all, delete-orphan")
     maintenance_windows = relationship("MaintenanceWindow", back_populates="monitor", cascade="all, delete-orphan")
+    alert_recipients = relationship(
+        "AlertRecipient",
+        back_populates="monitor",
+        cascade="all, delete-orphan",
+        foreign_keys="AlertRecipient.monitor_id",
+    )
 
     # Non mappés (pas des colonnes) : remplis à la lecture par le routeur via une
     # agrégation SQL, exposés via MonitorRead. Défaut None si pas calculé.
@@ -104,13 +172,22 @@ class MonitorGroup(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # user_id : créateur (audit/legacy), nullable + SET NULL (migration 0022). Autorité = team_id.
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     user = relationship("User", back_populates="monitor_groups")
+    team = relationship("Team", back_populates="monitor_groups")
     monitors = relationship("Monitor", back_populates="group")
+    alert_recipients = relationship(
+        "AlertRecipient",
+        back_populates="group",
+        cascade="all, delete-orphan",
+        foreign_keys="AlertRecipient.group_id",
+    )
 
 
 class StatusPage(Base):
@@ -128,6 +205,33 @@ class StatusPage(Base):
     )
 
     user = relationship("User", back_populates="status_page")
+
+
+class AlertRecipient(Base):
+    # Destinataire d'alerte attaché soit à un monitor, soit à un groupe (exactement un
+    # des deux), et désignant soit une adresse email libre, soit un membre d'équipe
+    # (exactement un des deux). Validation applicative (cf. routeur recipients).
+    __tablename__ = "alert_recipients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    monitor_id = Column(
+        Integer, ForeignKey("monitors.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    group_id = Column(
+        Integer, ForeignKey("monitor_groups.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Email libre (pas forcément un compte) OU membre d'équipe (member_user_id).
+    email = Column(String(255), nullable=True)
+    member_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    monitor = relationship("Monitor", back_populates="alert_recipients", foreign_keys=[monitor_id])
+    group = relationship("MonitorGroup", back_populates="alert_recipients", foreign_keys=[group_id])
+    member = relationship("User", foreign_keys=[member_user_id])
 
 
 class MaintenanceWindow(Base):

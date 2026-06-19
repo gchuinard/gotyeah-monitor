@@ -62,14 +62,24 @@ public_router = APIRouter(prefix="/public", tags=["public"])
 
 
 async def _load_public(db: AsyncSession, slug: str):
-    """Page par slug + ses monitors PUBLICS uniquement (jamais les privés)."""
+    """Page par slug + les monitors PUBLICS des équipes que le propriétaire ADMINISTRE
+    (jamais les privés ; ni les monitors des équipes où il est simple membre)."""
     res = await db.execute(select(models.StatusPage).where(models.StatusPage.slug == slug))
     page = res.scalars().first()
     if not page:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page introuvable")
+    res_t = await db.execute(
+        select(models.TeamMember.team_id).where(
+            models.TeamMember.user_id == page.user_id,
+            models.TeamMember.role == "admin",
+        )
+    )
+    admin_team_ids = [row[0] for row in res_t.all()]
+    if not admin_team_ids:
+        return page, []
     res2 = await db.execute(
         select(models.Monitor).where(
-            models.Monitor.user_id == page.user_id,
+            models.Monitor.team_id.in_(admin_team_ids),
             models.Monitor.is_public.is_(True),
         )
     )

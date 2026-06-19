@@ -43,7 +43,6 @@ def _ssl_level(days_left: int) -> Optional[int]:
 
 class _Alert:
     def __init__(self, monitor: "models.Monitor", kind: str, **data):
-        self.user = monitor.user
         self.monitor_name = monitor.name
         self.kind = kind  # 'down' | 'up' | 'ssl' | 'latency' | 'latency_recovery'
         self.data = data
@@ -83,8 +82,8 @@ def evaluate_alerts(monitors: List["models.Monitor"], now: datetime, in_maintena
         if m.id in in_maintenance:
             continue
 
-        # Pas de destinataire (monitor orphelin) -> rien à notifier
-        if m.user is None:
+        # Pas d'équipe (monitor orphelin) -> personne à notifier
+        if m.team is None:
             continue
 
         # Transition DOWN confirmée (seuil atteint, pas encore notifié)
@@ -164,35 +163,72 @@ async def _send_webhook(client: httpx.AsyncClient, url: str, kind: Optional[str]
         await client.post(url, json={"text": text}, timeout=10.0)
 
 
-async def _send_one(client: httpx.AsyncClient, a: _Alert) -> None:
-    user = a.user
-    # Alertes email activées par défaut ; si l'utilisateur les a coupées, il n'y a
-    # rien à envoyer par email -> on considère l'email "ok" pour quand même poser le
-    # drapeau (sinon l'alerte — et le webhook — se re-déclencheraient à chaque cycle).
-    email_enabled = getattr(user, "alert_email_enabled", True)
-    email_ok = not email_enabled
-    if email_enabled:
-        try:
-            if a.kind == "down":
-                await send_monitor_down_email(user.email, a.monitor_name, a.data["status_code"], a.data["since"])
-            elif a.kind == "up":
-                await send_monitor_up_email(user.email, a.monitor_name, a.data["since"], a.data["now"])
-            elif a.kind == "ssl":
-                await send_ssl_expiry_email(user.email, a.monitor_name, a.data["days_left"])
-            elif a.kind == "latency":
-                await send_latency_alert_email(user.email, a.monitor_name, a.data["latency_ms"], a.data["threshold_ms"])
-            elif a.kind == "latency_recovery":
-                await send_latency_recovery_email(user.email, a.monitor_name, a.data.get("latency_ms"))
-            email_ok = True
-        except Exception:
-            logger.exception("Échec envoi email d'alerte (%s / %s)", a.kind, a.monitor_name)
+def _resolve_email_recipients(monitor: "models.Monitor") -> List[str]:
+    """Destinataires email d'une alerte = union des destinataires du monitor et de son
+    groupe ; à défaut de tout destinataire configuré, repli sur les admins de l'équipe
+    (jamais d'alerte muette). Les emails libres partent toujours ; un destinataire-membre
+    est filtré s'il a coupé ses alertes email dans cette équipe (alert_email_enabled)."""
+    team = monitor.team
+    # Drapeau email par appartenance (user_id -> bool) pour cette équipe.
+    member_pref = {m.user_id: m.alert_email_enabled for m in team.members} if team else {}
 
-    # Webhook best-effort (n'influence pas le drapeau "déjà notifié")
-    if user.alert_webhook_url:
+    recipients = list(monitor.alert_recipients)
+    if monitor.group is not None:
+        recipients += list(monitor.group.alert_recipients)
+
+    emails: set = set()
+    for r in recipients:
+        if r.email:
+            emails.add(r.email)
+        elif r.member_user_id is not None and member_pref.get(r.member_user_id, True):
+            if r.member is not None:
+                emails.add(r.member.email)
+
+    # Repli : aucun destinataire explicite -> admins de l'équipe (qui n'ont pas coupé l'email).
+    if not recipients and team is not None:
+        for m in team.members:
+            if m.role == "admin" and m.alert_email_enabled and m.user is not None:
+                emails.add(m.user.email)
+
+    return sorted(emails)
+
+
+async def _send_email_to(to: str, a: _Alert) -> None:
+    if a.kind == "down":
+        await send_monitor_down_email(to, a.monitor_name, a.data["status_code"], a.data["since"])
+    elif a.kind == "up":
+        await send_monitor_up_email(to, a.monitor_name, a.data["since"], a.data["now"])
+    elif a.kind == "ssl":
+        await send_ssl_expiry_email(to, a.monitor_name, a.data["days_left"])
+    elif a.kind == "latency":
+        await send_latency_alert_email(to, a.monitor_name, a.data["latency_ms"], a.data["threshold_ms"])
+    elif a.kind == "latency_recovery":
+        await send_latency_recovery_email(to, a.monitor_name, a.data.get("latency_ms"))
+
+
+async def _send_one(client: httpx.AsyncClient, a: _Alert) -> None:
+    monitor = a._monitor
+    team = monitor.team
+    emails = _resolve_email_recipients(monitor)
+
+    # Un email par destinataire (pas de To groupé -> les destinataires ne se voient pas).
+    # email_ok : True s'il n'y avait rien à envoyer, ou si TOUS les envois ont réussi.
+    # Sinon on ne pose pas le drapeau -> nouvelle tentative au cycle suivant.
+    email_ok = True
+    for to in emails:
+        try:
+            await _send_email_to(to, a)
+        except Exception:
+            email_ok = False
+            logger.exception("Échec envoi email d'alerte (%s / %s -> %s)", a.kind, a.monitor_name, to)
+
+    # Webhook d'équipe, best-effort (n'influence pas le drapeau "déjà notifié").
+    webhook_url = getattr(team, "alert_webhook_url", None) if team else None
+    if webhook_url:
         try:
             # Anti-SSRF : ne jamais POSTer vers une cible interne (même garde que les checks).
-            if await url_is_safe(user.alert_webhook_url):
-                await _send_webhook(client, user.alert_webhook_url, user.alert_webhook_kind, _alert_text(a))
+            if await url_is_safe(webhook_url):
+                await _send_webhook(client, webhook_url, team.alert_webhook_kind, _alert_text(a))
             else:
                 logger.warning("Webhook ignoré : URL vers une cible interne/non autorisée")
         except Exception:

@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 import models
 import schemas
+import team_access
 from auth import get_current_user, get_user_flexible
 
 router = APIRouter(prefix="/monitors", tags=["monitors"])
@@ -96,25 +97,36 @@ async def _attach_maintenance(db: AsyncSession, monitors: List[models.Monitor]) 
 
 
 async def _validate_group(
-    db: AsyncSession, group_id: Optional[int], user: models.User
+    db: AsyncSession, group_id: Optional[int], team_id: int
 ) -> None:
-    """Si un group_id est fourni, vérifie qu'il existe et appartient à l'utilisateur."""
+    """Si un group_id est fourni, vérifie qu'il existe et appartient à la MÊME équipe
+    que le monitor (un monitor ne peut rejoindre qu'un groupe de son équipe)."""
     if group_id is None:
         return
     group = await db.get(models.MonitorGroup, group_id)
     if not group:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Groupe introuvable")
-    if group.user_id != user.id:
+    if group.team_id != team_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Groupe non autorisé")
 
 
 @router.get("", response_model=List[schemas.MonitorRead])
 async def list_monitors(
+    team_id: Optional[int] = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.MonitorRead]:
+    # team_id fourni -> cette équipe (appartenance vérifiée) ; sinon toutes les équipes
+    # du user (utile pour les tokens d'API en lecture).
+    if team_id is not None:
+        await team_access.require_team(db, team_id, current_user, "readonly")
+        team_ids = [team_id]
+    else:
+        team_ids = await team_access.user_team_ids(db, current_user.id)
+    if not team_ids:
+        return []
     result = await db.execute(
-        select(models.Monitor).where(models.Monitor.user_id == current_user.id)
+        select(models.Monitor).where(models.Monitor.team_id.in_(team_ids))
     )
     monitors = list(result.scalars().all())
     await _attach_uptime(db, monitors)
@@ -130,7 +142,8 @@ async def create_monitor(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.MonitorRead:
-    await _validate_group(db, payload.group_id, current_user)
+    await team_access.require_team(db, payload.team_id, current_user, "member")
+    await _validate_group(db, payload.group_id, payload.team_id)
     monitor = models.Monitor(
         name=payload.name,
         url=str(payload.url),
@@ -142,7 +155,9 @@ async def create_monitor(
         latency_threshold_ms=payload.latency_threshold_ms,
         port=payload.port,
         group_id=payload.group_id,
+        environment=payload.environment,
         is_public=payload.is_public,
+        team_id=payload.team_id,
         user_id=current_user.id,
     )
     db.add(monitor)
@@ -157,11 +172,7 @@ async def get_monitor(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_user_flexible),
 ) -> schemas.MonitorRead:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    monitor, _ = await team_access.require_monitor(db, monitor_id, current_user, "readonly")
     await _attach_uptime(db, [monitor])
     await _attach_maintenance(db, [monitor])
     return monitor
@@ -176,16 +187,8 @@ async def update_monitor(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.MonitorRead:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-
-    if monitor.user_id is None:
-        monitor.user_id = current_user.id
-    elif monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
-    await _validate_group(db, payload.group_id, current_user)
+    monitor, _ = await team_access.require_monitor(db, monitor_id, current_user, "member")
+    await _validate_group(db, payload.group_id, monitor.team_id)
 
     monitor.name = payload.name
     monitor.url = str(payload.url)
@@ -197,6 +200,7 @@ async def update_monitor(
     monitor.latency_threshold_ms = payload.latency_threshold_ms
     monitor.port = payload.port
     monitor.group_id = payload.group_id
+    monitor.environment = payload.environment
     monitor.is_public = payload.is_public
 
     await db.commit()
@@ -210,15 +214,7 @@ async def delete_monitor(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> None:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-
-    if monitor.user_id is None:
-        monitor.user_id = current_user.id
-    elif monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
+    monitor, _ = await team_access.require_monitor(db, monitor_id, current_user, "member")
     await db.delete(monitor)
     await db.commit()
     return None
@@ -230,11 +226,7 @@ async def get_monitor_history(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.MonitorCheckRead]:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    await team_access.require_monitor(db, monitor_id, current_user, "readonly")
 
     result = await db.execute(
         select(models.MonitorCheck)
@@ -250,11 +242,7 @@ async def get_monitor_incidents(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.IncidentRead]:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    await team_access.require_monitor(db, monitor_id, current_user, "readonly")
 
     result = await db.execute(
         select(models.Incident)
@@ -272,11 +260,7 @@ async def get_monitor_sla(
     current_user: models.User = Depends(get_user_flexible),
 ) -> List[schemas.SlaMonth]:
     """Uptime mensuel (12 derniers mois) depuis le rollup quotidien."""
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    await team_access.require_monitor(db, monitor_id, current_user, "readonly")
 
     month = func.date_format(models.MonitorUptimeDaily.day, "%Y-%m")
     stmt = (
@@ -307,7 +291,7 @@ async def update_incident(
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.IncidentRead:
     """Acquitte un incident et/ou enregistre un post-mortem."""
-    await _owned_monitor(db, monitor_id, current_user)
+    await team_access.require_monitor(db, monitor_id, current_user, "member")
     incident = await db.get(models.Incident, incident_id)
     if not incident or incident.monitor_id != monitor_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
@@ -320,22 +304,13 @@ async def update_incident(
     return incident
 
 
-async def _owned_monitor(db: AsyncSession, monitor_id: int, current_user: models.User) -> models.Monitor:
-    monitor = await db.get(models.Monitor, monitor_id)
-    if not monitor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if monitor.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return monitor
-
-
 @router.get("/{monitor_id}/maintenance", response_model=List[schemas.MaintenanceWindowRead])
 async def list_maintenance(
     monitor_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> List[schemas.MaintenanceWindowRead]:
-    await _owned_monitor(db, monitor_id, current_user)
+    await team_access.require_monitor(db, monitor_id, current_user, "readonly")
     res = await db.execute(
         select(models.MaintenanceWindow)
         .where(models.MaintenanceWindow.monitor_id == monitor_id)
@@ -356,7 +331,7 @@ async def create_maintenance(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> schemas.MaintenanceWindowRead:
-    await _owned_monitor(db, monitor_id, current_user)
+    await team_access.require_monitor(db, monitor_id, current_user, "member")
     window = models.MaintenanceWindow(
         monitor_id=monitor_id,
         start_at=payload.start_at,
@@ -376,10 +351,70 @@ async def delete_maintenance(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ) -> None:
-    await _owned_monitor(db, monitor_id, current_user)
+    await team_access.require_monitor(db, monitor_id, current_user, "member")
     window = await db.get(models.MaintenanceWindow, window_id)
     if not window or window.monitor_id != monitor_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     await db.delete(window)
+    await db.commit()
+    return None
+
+
+# ── Destinataires d'alerte du monitor ─────────────────────────────────────────
+
+
+@router.get("/{monitor_id}/recipients", response_model=List[schemas.AlertRecipientRead])
+async def list_monitor_recipients(
+    monitor_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> List[schemas.AlertRecipientRead]:
+    await team_access.require_monitor(db, monitor_id, current_user, "readonly")
+    res = await db.execute(
+        select(models.AlertRecipient)
+        .where(models.AlertRecipient.monitor_id == monitor_id)
+        .order_by(models.AlertRecipient.id.asc())
+    )
+    return [await team_access.recipient_read(db, r) for r in res.scalars().all()]
+
+
+@router.post(
+    "/{monitor_id}/recipients",
+    response_model=schemas.AlertRecipientRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_monitor_recipient(
+    monitor_id: int,
+    payload: schemas.AlertRecipientCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> schemas.AlertRecipientRead:
+    monitor, _ = await team_access.require_monitor(db, monitor_id, current_user, "member")
+    await team_access.validate_recipient_member(db, payload.member_user_id, monitor.team_id)
+    rec = models.AlertRecipient(
+        monitor_id=monitor_id,
+        email=str(payload.email) if payload.email else None,
+        member_user_id=payload.member_user_id,
+    )
+    db.add(rec)
+    await db.commit()
+    await db.refresh(rec)
+    return await team_access.recipient_read(db, rec)
+
+
+@router.delete(
+    "/{monitor_id}/recipients/{recipient_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_monitor_recipient(
+    monitor_id: int,
+    recipient_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+) -> None:
+    await team_access.require_monitor(db, monitor_id, current_user, "member")
+    rec = await db.get(models.AlertRecipient, recipient_id)
+    if not rec or rec.monitor_id != monitor_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    await db.delete(rec)
     await db.commit()
     return None

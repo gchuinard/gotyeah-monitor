@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 import models
 import schemas
+import team_access
 from rate_limit import limiter
-from ssrf_guard import url_is_safe
 from mail_service import (
     send_verification_email,
     send_password_reset_email,
@@ -213,6 +213,10 @@ async def register_user(
     db.add(user)
     await db.flush()
 
+    # Équipe personnelle (le compte en est l'admin) : tout nouveau compte a un espace
+    # où créer des monitors dès la connexion.
+    await team_access.create_team(db, "Mon espace", user.id)
+
     token = secrets.token_urlsafe(32)
     db.add(models.EmailVerification(
         user_id=user.id, token=_hash_token(token), expires_at=expires
@@ -349,12 +353,9 @@ async def delete_me(
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    from sqlalchemy import select as sa_select
-    result = await db.execute(sa_select(models.Monitor).where(models.Monitor.user_id == current_user.id))
-    for monitor in result.scalars().all():
-        await db.delete(monitor)
-    await db.delete(current_user)
-    await db.commit()
+    # Garde "toujours >= 1 admin" + nettoyage des équipes dont on est seul membre.
+    # Les ressources des équipes partagées survivent (créateur en SET NULL).
+    await team_access.delete_user_cascade(db, current_user)
 
 
 @router.put("/me", response_model=schemas.UserRead)
@@ -377,19 +378,8 @@ async def update_me(
     if payload.password:
         current_user.hashed_password = get_password_hash(payload.password)
 
-    if payload.alert_email_enabled is not None:
-        current_user.alert_email_enabled = payload.alert_email_enabled
-
-    # Config webhook d'alerte : "" => effacer, valeur => définir, None => ne pas toucher.
-    if payload.alert_webhook_url is not None:
-        url = payload.alert_webhook_url.strip()
-        if url and not await url_is_safe(url):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="URL de webhook invalide ou pointant vers une cible interne.",
-            )
-        current_user.alert_webhook_url = url or None
-        current_user.alert_webhook_kind = (payload.alert_webhook_kind or None) if url else None
+    # Les préférences d'alerte ont migré : drapeau email par appartenance
+    # (PATCH /teams/{id}/me) et webhook par équipe (PUT /teams/{id}).
 
     await db.commit()
     await db.refresh(current_user)

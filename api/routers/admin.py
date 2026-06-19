@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 import models
 import schemas
+import team_access
 from auth import get_current_user
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -77,12 +78,8 @@ async def admin_delete_user(
     user = await db.get(models.User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    result = await db.execute(select(models.Monitor).where(models.Monitor.user_id == user_id))
-    monitors = result.scalars().all()
-    for monitor in monitors:
-        await db.delete(monitor)
-    await db.delete(user)
-    await db.commit()
+    # Même garde "dernier admin" + nettoyage des équipes mono-membre que /auth/me.
+    await team_access.delete_user_cascade(db, user)
 
 
 @router.get("/users", response_model=List[schemas.UserWithMonitors])

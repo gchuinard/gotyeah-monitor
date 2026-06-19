@@ -27,6 +27,7 @@ from ssrf_guard import url_is_safe, host_is_safe
 from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD
 from routers import monitors
 from routers import groups
+from routers import teams
 from routers import public
 from routers import api_tokens
 from routers import admin
@@ -336,9 +337,20 @@ async def _active_maintenance(session: AsyncSession, now: datetime) -> set:
 async def _run_one_cycle(client: httpx.AsyncClient) -> None:
     async with AsyncSessionLocal() as session:
         try:
-            # selectinload(user) : la boucle a besoin de l'email/webhook de l'owner pour alerter.
+            # La boucle a besoin, pour résoudre les destinataires d'alerte : l'équipe et
+            # ses membres (repli admins + drapeau email + webhook d'équipe), et les
+            # destinataires attachés au monitor et à son groupe (emails + membres).
             result = await session.execute(
-                select(models.Monitor).options(selectinload(models.Monitor.user))
+                select(models.Monitor).options(
+                    selectinload(models.Monitor.team)
+                    .selectinload(models.Team.members)
+                    .selectinload(models.TeamMember.user),
+                    selectinload(models.Monitor.alert_recipients)
+                    .selectinload(models.AlertRecipient.member),
+                    selectinload(models.Monitor.group)
+                    .selectinload(models.MonitorGroup.alert_recipients)
+                    .selectinload(models.AlertRecipient.member),
+                )
             )
             all_monitors = list(result.scalars().all())
 
@@ -521,6 +533,7 @@ async def health_head():
 app.include_router(auth_router)
 app.include_router(monitors.router)
 app.include_router(groups.router)
+app.include_router(teams.router)
 app.include_router(public.manage_router)
 app.include_router(public.public_router)
 app.include_router(api_tokens.router)

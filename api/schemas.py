@@ -23,19 +23,13 @@ WebhookKind = Literal["discord", "slack", "ntfy", "generic"]
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=PASSWORD_MIN, max_length=PASSWORD_MAX)
-    # None = champ non fourni (pas de changement).
-    alert_email_enabled: Optional[bool] = None
-    # "" pour effacer le webhook ; None = champ non fourni (pas de changement).
-    alert_webhook_url: Optional[str] = Field(default=None, max_length=512)
-    alert_webhook_kind: Optional[WebhookKind] = None
+    # Les préférences d'alerte ont migré : le drapeau email est par appartenance
+    # (PATCH /teams/{id}/me), le webhook est par équipe (PUT /teams/{id}).
 
 
 class UserRead(UserBase):
     id: int
     created_at: datetime
-    alert_email_enabled: bool = True
-    alert_webhook_url: Optional[str] = None
-    alert_webhook_kind: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -61,6 +55,8 @@ class MonitorBase(BaseModel):
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     # Groupe d'appartenance (None = sans groupe)
     group_id: Optional[int] = None
+    # Étiquette d'environnement (prod/staging/dev ou libre ; None = aucune)
+    environment: Optional[str] = Field(default=None, max_length=50)
     # Exposé sur la page de statut publique
     is_public: bool = False
 
@@ -75,6 +71,8 @@ def _require_port_for_port_type(model: "MonitorBase") -> "MonitorBase":
 
 class MonitorCreate(MonitorBase):
     expected_status_code: int = Field(default=200, ge=100, le=599)
+    # Équipe propriétaire (obligatoire à la création ; vérifiée côté routeur).
+    team_id: int
 
     @model_validator(mode="after")
     def _validate(self) -> "MonitorCreate":
@@ -91,6 +89,7 @@ class MonitorUpdate(MonitorBase):
 
 class MonitorRead(MonitorBase):
     id: int
+    team_id: Optional[int] = None
     status: str
     last_latency_ms: Optional[int] = None
     last_checked_at: Optional[datetime] = None
@@ -114,7 +113,8 @@ class MonitorGroupBase(BaseModel):
 
 
 class MonitorGroupCreate(MonitorGroupBase):
-    pass
+    # Équipe propriétaire (obligatoire à la création ; vérifiée côté routeur).
+    team_id: int
 
 
 class MonitorGroupUpdate(MonitorGroupBase):
@@ -123,10 +123,86 @@ class MonitorGroupUpdate(MonitorGroupBase):
 
 class MonitorGroupRead(MonitorGroupBase):
     id: int
+    team_id: Optional[int] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+TeamRole = Literal["admin", "member", "readonly"]
+
+
+class TeamBase(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
+class TeamCreate(TeamBase):
+    pass
+
+
+class TeamUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    # "" pour effacer le webhook ; None = champ non fourni (pas de changement).
+    alert_webhook_url: Optional[str] = Field(default=None, max_length=512)
+    alert_webhook_kind: Optional[WebhookKind] = None
+
+
+class TeamRead(TeamBase):
+    id: int
+    alert_webhook_url: Optional[str] = None
+    alert_webhook_kind: Optional[str] = None
+    created_at: datetime
+    # Renseignés au runtime par le routeur (pas des colonnes) :
+    role: Optional[str] = None  # rôle de l'utilisateur courant dans cette équipe
+    member_count: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TeamMemberRead(BaseModel):
+    id: int
+    user_id: int
+    email: EmailStr
+    role: str
+    alert_email_enabled: bool
+    created_at: datetime
+
+
+class TeamMemberInvite(BaseModel):
+    # On invite un compte EXISTANT par son email (pas de création de compte ici).
+    email: EmailStr
+    role: TeamRole = "member"
+
+
+class TeamMemberRoleUpdate(BaseModel):
+    role: TeamRole
+
+
+class MembershipPrefsUpdate(BaseModel):
+    # Préférence par appartenance : couper les alertes email pour soi dans cette équipe.
+    alert_email_enabled: bool
+
+
+class AlertRecipientCreate(BaseModel):
+    # Exactement un des deux : email libre OU membre d'équipe (member_user_id).
+    email: Optional[EmailStr] = None
+    member_user_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> "AlertRecipientCreate":
+        if (self.email is None) == (self.member_user_id is None):
+            raise ValueError("Fournir soit un email, soit un membre (exactement un).")
+        return self
+
+
+class AlertRecipientRead(BaseModel):
+    id: int
+    email: Optional[str] = None
+    member_user_id: Optional[int] = None
+    member_email: Optional[str] = None  # résolu pour l'affichage (si membre)
+    created_at: datetime
 
 
 class StatusPageRead(BaseModel):
