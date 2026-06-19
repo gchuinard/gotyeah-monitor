@@ -1,6 +1,6 @@
 # GotYeah Monitor
 
-Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des services en **HTTP, ping ou port (TCP)**, vérifie codes de statut et **contenu (mot-clé)**, mesure la latence, suit l'expiration SSL, **alerte par email et webhook** (panne, rétablissement, latence, SSL), calcule le **% d'uptime (24h → 90j) et un SLA mensuel**, tient un **journal d'incidents**, et publie une **page de statut publique** avec badge SVG.
+Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des services en **HTTP, ping ou port (TCP)**, vérifie codes de statut et **contenu (mot-clé)**, mesure la latence, suit l'expiration SSL, **alerte par email et webhook** (panne, rétablissement, latence, SSL), calcule le **% d'uptime (24h → 90j) et un SLA mensuel**, tient un **journal d'incidents**, et publie une **page de statut publique** avec badge SVG. Collaboratif : **équipes** avec rôles (admin / membre / lecture seule), **destinataires d'alerte par monitor et par groupe** (emails libres ou membres), et **étiquette d'environnement** (prod / staging / dev).
 
 ## Stack technique
 
@@ -21,12 +21,16 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des ser
 - Détection et affichage de l'**expiration SSL**
 
 ### Organisation & partage
-- **Groupes de monitors** : dashboard regroupé repliable + barre de recherche
-- **Page de statut publique** par utilisateur (`/status/<slug>`, accessible sans connexion) + **badge SVG d'uptime** embeddable — seuls les monitors marqués « publics » sont exposés (jamais l'URL ni de détail privé)
+- **Équipes** : les monitors et groupes appartiennent à une équipe (chaque compte a son équipe personnelle, créée à l'inscription). Un sélecteur d'équipe en tête de dashboard ; on bascule entre ses équipes.
+- **Rôles par équipe** : `admin` (gère membres, paramètres, webhook), `membre` (CRUD des monitors/groupes/destinataires), `lecture seule` (consultation). Une équipe garde toujours **au moins un admin** (impossible de rétrograder/retirer le dernier, ni de supprimer un compte qui l'est).
+- **Groupes de monitors** : dashboard regroupé repliable + barre de recherche (au sein de l'équipe active)
+- **Étiquette d'environnement** (prod / staging / dev, ou libre) par monitor : badge sur la carte + filtre du dashboard
+- **Page de statut publique** par utilisateur (`/status/<slug>`, accessible sans connexion) + **badge SVG d'uptime** embeddable — n'expose que les monitors marqués « publics » des équipes que l'utilisateur **administre** (jamais l'URL ni de détail privé)
 - **Tokens d'API en lecture seule** (`Authorization: Bearer gym_…`) pour interroger l'API depuis Grafana / scripts sans le mot de passe
 
 ### Alerting & incidents
 - **Alerting** email + webhook (Discord / Slack / ntfy / générique) sur **panne** (après 2 échecs consécutifs — anti-flapping), **rétablissement**, **latence élevée** (seuil par monitor), et **expiration SSL** (J-30 / J-14 / J-7 / J-1 / expiré)
+- **Destinataires d'alerte ciblés** : par monitor **et** par groupe, en adresses email libres ou en membres de l'équipe (chaque membre peut couper ses propres emails pour une équipe). Sans destinataire configuré, les **admins de l'équipe** sont notifiés (jamais d'alerte perdue). Le **webhook est configuré par équipe**.
 - **Journal d'incidents** persisté (ouverture/fermeture automatiques, conservé bien au-delà des checks), avec **acquittement + note de post-mortem**
 - **Fenêtres de maintenance** planifiées : muettent alertes et ouvertures d'incident pendant la fenêtre (les checks continuent)
 
@@ -42,11 +46,13 @@ Outil de monitoring de disponibilité (uptime) auto-hébergé. Surveille des ser
 gotyeah-monitor/
 ├── api/                  # FastAPI — logique métier, checks, auth
 │   ├── routers/
-│   │   ├── monitors.py   # CRUD monitors + uptime/SLA + incidents + maintenance
-│   │   ├── groups.py     # Groupes de monitors
+│   │   ├── monitors.py   # CRUD monitors + uptime/SLA + incidents + maintenance + destinataires
+│   │   ├── groups.py     # Groupes de monitors + destinataires de groupe
+│   │   ├── teams.py      # Équipes, membres, rôles, webhook d'équipe
 │   │   ├── public.py     # Page de statut publique (non auth) + gestion + badge SVG
 │   │   ├── api_tokens.py # Tokens d'API (lecture seule)
-│   │   └── admin.py      # Routes admin
+│   │   └── admin.py      # Routes admin (plateforme, ADMIN_EMAILS)
+│   ├── team_access.py    # Autorisation par équipe (membership + rôle) + garde dernier-admin
 │   ├── auth.py           # JWT (PyJWT), inscription, vérification email, rate-limit
 │   ├── models.py         # Modèles SQLAlchemy
 │   ├── schemas.py        # Schémas Pydantic
@@ -120,7 +126,7 @@ VITE_API_URL=http://localhost:8000
 # HEARTBEAT_URL=
 ```
 
-> Les **alertes email** sont actives par défaut mais peuvent être coupées par utilisateur, et le **webhook d'alerte** (Discord / Slack / ntfy) s'active **par utilisateur** : tout se configure dans Profil → Notifications.
+> Les **alertes email** sont actives par défaut ; chaque membre peut les couper pour une équipe donnée, et le **webhook d'alerte** (Discord / Slack / ntfy) se configure **par équipe** (par un admin). Tout se gère dans Profil → Équipe. Les **destinataires précis** d'un monitor ou d'un groupe se gèrent depuis la fiche du monitor / le gestionnaire de groupes.
 
 ## Déploiement en production
 
