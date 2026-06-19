@@ -542,6 +542,17 @@
 		teamsLoadedFor = null; // force un rechargement à l'ouverture
 		showTeams = true;
 	}
+	// Sélecteur d'espace du header : l'option spéciale « __add__ » ouvre le modal de
+	// création au lieu de changer d'espace (on rétablit la sélection courante).
+	function onTeamSelect(e: Event) {
+		const sel = e.currentTarget as HTMLSelectElement;
+		if (sel.value === '__add__') {
+			sel.value = String($activeTeamId ?? '');
+			openTeams();
+			return;
+		}
+		activeTeamId.set(Number(sel.value));
+	}
 	// Recharge la gestion quand le modal est ouvert et que l'équipe gérée change.
 	$: if (showTeams && $activeTeamId !== teamsLoadedFor) {
 		teamsLoadedFor = $activeTeamId;
@@ -923,14 +934,16 @@
 					<!-- Sélecteur d'équipe + rôle -->
 					{#if $teams.length > 0}
 						<select
-							bind:value={$activeTeamId}
+							value={$activeTeamId}
+							on:change={onTeamSelect}
 							class="field w-auto shrink-0 text-sm max-w-[160px]"
-							title="Équipe active"
-							aria-label="Équipe active"
+							title="Espace actif"
+							aria-label="Espace actif"
 						>
 							{#each $teams as t (t.id)}
 								<option value={t.id}>{t.name}</option>
 							{/each}
+							<option value="__add__">+ Ajouter un espace…</option>
 						</select>
 					{/if}
 					{#if isReadonly}
