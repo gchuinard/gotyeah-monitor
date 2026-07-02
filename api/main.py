@@ -32,6 +32,7 @@ from routers import public
 from routers import api_tokens
 from routers import admin
 from auth import router as auth_router
+from oidc import router as oidc_router
 
 app = FastAPI(redirect_slashes=False)
 
@@ -563,6 +564,7 @@ async def health_head():
 
 
 app.include_router(auth_router)
+app.include_router(oidc_router)
 app.include_router(monitors.router)
 app.include_router(groups.router)
 app.include_router(teams.router)
