@@ -3,7 +3,7 @@ email/mot de passe — pas à la place.
 
 Flux : Authorization Code + PKCE, piloté par le backend, qui émet ENSUITE le même JWT
 applicatif que le login classique (voir auth.create_access_token). Aucune dépendance
-nouvelle : échange de code via httpx, validation de l'id_token via PyJWT (PyJWKClient),
+nouvelle : échange de code via httpx, validation de l'id_token via PyJWT (JWKS via httpx),
 tous deux déjà présents.
 
 État (state/nonce/code_verifier) transporté dans un cookie signé (HS256, SECRET_KEY),
@@ -23,9 +23,8 @@ from urllib.parse import urlencode
 
 import httpx
 import jwt
-from jwt import PyJWKClient, PyJWTError
+from jwt import PyJWKSet, PyJWTError
 from fastapi import APIRouter, Depends, Request, status
-from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,10 +64,10 @@ _STATE_TTL_SECONDS = 600
 
 router = APIRouter(prefix="/auth/oidc", tags=["auth"])
 
-# Caches process (discovery + client JWKS). Idempotents : une éventuelle course au
+# Caches process (discovery + JWKS). Idempotents : une éventuelle course au
 # premier appel ne fait que refetch, sans effet de bord.
 _discovery: Optional[dict] = None
-_jwks_client: Optional[PyJWKClient] = None
+_jwks_set: Optional[PyJWKSet] = None
 
 
 async def _get_discovery() -> dict:
@@ -83,11 +82,31 @@ async def _get_discovery() -> dict:
     return _discovery
 
 
-def _get_jwks_client(jwks_uri: str) -> PyJWKClient:
-    global _jwks_client
-    if _jwks_client is None:
-        _jwks_client = PyJWKClient(jwks_uri)
-    return _jwks_client
+async def _get_signing_key(jwks_uri: str, id_token: str):
+    """Clé de signature (par kid) récupérée via HTTPX. On n'utilise PAS PyJWKClient :
+    il fetch le JWKS via urllib, dont l'User-Agent est bloqué (HTTP 403) par le Bot
+    Fight Mode de Cloudflare sur le trajet hairpin — alors que httpx passe."""
+    global _jwks_set
+    kid = jwt.get_unverified_header(id_token).get("kid")
+
+    def _find(ks: PyJWKSet):
+        for k in ks.keys:
+            if k.key_id == kid:
+                return k.key
+        return None
+
+    if _jwks_set is not None:
+        key = _find(_jwks_set)
+        if key is not None:
+            return key
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(jwks_uri, timeout=10.0)
+        resp.raise_for_status()
+        _jwks_set = PyJWKSet.from_dict(resp.json())
+    key = _find(_jwks_set)
+    if key is None:
+        raise PyJWTError("aucune JWK ne correspond au kid de l'id_token")
+    return key
 
 
 def _pkce_pair() -> tuple[str, str]:
@@ -228,8 +247,7 @@ async def oidc_callback(
 
     # 3) Valider l'id_token (signature via JWKS, iss/aud/exp, puis nonce).
     try:
-        jwks = _get_jwks_client(disc["jwks_uri"])
-        signing_key = await run_in_threadpool(jwks.get_signing_key_from_jwt, id_token)
+        signing_key = await _get_signing_key(disc["jwks_uri"], id_token)
         algs = [
             a
             for a in disc.get("id_token_signing_alg_values_supported", [])
@@ -237,13 +255,13 @@ async def oidc_callback(
         ] or ["RS256"]
         claims = jwt.decode(
             id_token,
-            signing_key.key,
+            signing_key,
             algorithms=algs,
             audience=OIDC_CLIENT_ID,
             issuer=disc["issuer"],
             options={"require": ["exp", "iat", "aud", "iss"]},
         )
-    except PyJWTError:
+    except (PyJWTError, httpx.HTTPError):
         return _fail("idtoken")
     if not secrets.compare_digest(claims.get("nonce", ""), st.get("nonce", "")):
         return _fail("nonce")
