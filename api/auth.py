@@ -46,6 +46,12 @@ if not SECRET_KEY or len(SECRET_KEY) < 32:
         )
 
 
+def legacy_login_enabled() -> bool:
+    """Login par mot de passe (formulaire email). Désactivable via LEGACY_LOGIN=off
+    quand l'app passe en « comptes GotYeah uniquement ». Réactivable (break-glass)."""
+    return os.getenv("LEGACY_LOGIN", "on").strip().lower() != "off"
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
@@ -178,6 +184,11 @@ async def register_user(
     payload: schemas.UserCreate,
     db: AsyncSession = Depends(get_db),
 ) -> schemas.MessageResponse:
+    if not legacy_login_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inscription désactivée. Cette instance utilise les comptes GotYeah.",
+        )
     # Réponse générique identique quel que soit l'état du compte (anti-énumération).
     generic = schemas.MessageResponse(
         message="Compte créé. Vérifiez votre email pour activer votre compte."
@@ -516,6 +527,11 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> schemas.Token:
+    if not legacy_login_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Connexion par mot de passe désactivée. Utilisez « Se connecter avec GotYeah ».",
+        )
     user = await get_user_by_email(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(

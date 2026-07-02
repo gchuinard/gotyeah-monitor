@@ -13,10 +13,14 @@
 	let submitting = false;
 	let error: string | null = null;
 
-	// SSO / OIDC (bouton « Se connecter avec Pocket ID »)
+	// SSO / OIDC (bouton « Se connecter avec GotYeah »)
 	let oidcEnabled = false;
-	let oidcLabel = 'Se connecter avec Pocket ID';
+	let oidcLabel = 'Se connecter avec GotYeah';
 	let processingSso = false;
+	// Login par mot de passe : masqué si LEGACY_LOGIN=off côté API. Fail-safe : on le
+	// garde TANT que l'OIDC n'est pas confirmé actif (jamais de page sans aucune entrée).
+	let legacyLogin = true;
+	$: showPasswordForm = legacyLogin || !oidcEnabled;
 
 	/** Authentifie (form-urlencoded /auth/login), récupère le profil via /auth/me, stocke le JWT puis redirige vers le dashboard. */
 	async function onSubmit() {
@@ -71,17 +75,17 @@
 	function ssoErrorMessage(code: string): string {
 		switch (code) {
 			case 'provider':
-				return 'Connexion via Pocket ID refusée ou annulée.';
+				return 'Connexion via GotYeah refusée ou annulée.';
 			case 'nosignup':
-				return "Aucun compte Monitor n'est associé à cet identifiant Pocket ID.";
+				return "Aucun compte Monitor n'est associé à cet identifiant GotYeah.";
 			case 'unverified':
 				return "Adresse email non vérifiée côté fournisseur d'identité.";
 			case 'noemail':
 				return "Le fournisseur d'identité n'a pas transmis d'adresse email.";
 			case 'disabled':
-				return 'La connexion via Pocket ID est désactivée.';
+				return 'La connexion via GotYeah est désactivée.';
 			default:
-				return 'Échec de la connexion via Pocket ID. Réessayez.';
+				return 'Échec de la connexion via GotYeah. Réessayez.';
 		}
 	}
 
@@ -128,16 +132,17 @@
 			return;
 		}
 
-		// Sinon : demander à l'API si le bouton OIDC doit être affiché.
+		// Sinon : demander à l'API l'état de l'auth (bouton OIDC + login mot de passe actif ?).
 		try {
 			const res = await fetch(`${API_URL}/auth/oidc/status`);
 			if (res.ok) {
 				const data = await res.json();
 				oidcEnabled = !!data.enabled;
 				if (data.label) oidcLabel = data.label as string;
+				legacyLogin = data.legacy_login !== false;
 			}
 		} catch {
-			// Réseau indisponible : on masque simplement le bouton.
+			// Réseau indisponible : on garde le formulaire par défaut.
 		}
 	});
 </script>
@@ -150,7 +155,7 @@
 	           border border-white/70 dark:border-slate-800 shadow-soft-lg
 	           text-slate-600 dark:text-slate-300"
 		>
-			Connexion via Pocket ID en cours…
+			Connexion via GotYeah en cours…
 		</div>
 	</div>
 {/if}
@@ -161,94 +166,100 @@
 >
 	<div
 		class="w-full max-w-md mx-auto p-8
-           rounded-3xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl
-           border border-white/70 dark:border-slate-800 shadow-soft-lg"
+	           rounded-3xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl
+	           border border-white/70 dark:border-slate-800 shadow-soft-lg"
 	>
 		<div class="flex flex-col gap-1 mb-6">
 			<div class="eyebrow">GotYeah Monitor</div>
 			<h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Connexion</h1>
 		</div>
 
-		<form class="flex flex-col gap-4" on:submit|preventDefault={onSubmit}>
-			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600 dark:text-slate-300">Email</span>
-				<input type="email" class="field" bind:value={email} required />
-			</label>
-
-			<label class="flex flex-col gap-1">
-				<span class="text-sm text-slate-600 dark:text-slate-300">Mot de passe</span>
-				<input type="password" class="field" bind:value={password} required />
-			</label>
-
-			{#if error}
-				<div
-					class="flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
+		{#if error}
+			<div
+				class="mb-4 flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-rose-600 bg-rose-50 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30"
+			>
+				<svg
+					class="w-4 h-4 shrink-0 mt-0.5"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					viewBox="0 0 24 24"
 				>
-					<svg
-						class="w-4 h-4 shrink-0 mt-0.5"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-						/>
-					</svg>
-					{error}
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+					/>
+				</svg>
+				{error}
+			</div>
+		{/if}
+
+		{#if showPasswordForm}
+			<form class="flex flex-col gap-4" on:submit|preventDefault={onSubmit}>
+				<label class="flex flex-col gap-1">
+					<span class="text-sm text-slate-600 dark:text-slate-300">Email</span>
+					<input type="email" class="field" bind:value={email} required />
+				</label>
+
+				<label class="flex flex-col gap-1">
+					<span class="text-sm text-slate-600 dark:text-slate-300">Mot de passe</span>
+					<input type="password" class="field" bind:value={password} required />
+				</label>
+
+				<button
+					type="submit"
+					class="btn btn-md btn-primary mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={submitting}
+				>
+					{submitting ? 'Connexion...' : 'Se connecter'}
+				</button>
+			</form>
+		{/if}
+
+		{#if oidcEnabled}
+			{#if showPasswordForm}
+				<div class="my-4 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
+					<span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
+					ou
+					<span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
 				</div>
 			{/if}
 
 			<button
-				type="submit"
-				class="btn btn-md btn-primary mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-				disabled={submitting}
-			>
-				{submitting ? 'Connexion...' : 'Se connecter'}
-			</button>
-		</form>
-
-		{#if oidcEnabled}
-			<div class="my-4 flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
-				<span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
-				ou
-				<span class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></span>
-			</div>
-
-			<button
 				type="button"
-				class="btn btn-md w-full border border-slate-300 dark:border-slate-700
-				       bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800
-				       text-slate-700 dark:text-slate-200"
+				class="btn btn-md w-full mt-2 {showPasswordForm
+					? 'border border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+					: 'btn-primary'}"
 				on:click={startOidc}
 			>
 				{oidcLabel}
 			</button>
 		{/if}
 
-		<div class="mt-4 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400">
-			<div>
-				Mot de passe oublié ?
-				<button
-					type="button"
-					class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 underline"
-					on:click={() => goto('/forgot-password')}
-				>
-					Réinitialiser
-				</button>
+		{#if showPasswordForm}
+			<div class="mt-4 flex flex-col gap-2 text-xs text-slate-500 dark:text-slate-400">
+				<div>
+					Mot de passe oublié ?
+					<button
+						type="button"
+						class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 underline"
+						on:click={() => goto('/forgot-password')}
+					>
+						Réinitialiser
+					</button>
+				</div>
+				<div>
+					Pas encore de compte ?
+					<button
+						type="button"
+						class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 underline"
+						on:click={() => goto('/register')}
+					>
+						Créer un compte
+					</button>
+				</div>
 			</div>
-			<div>
-				Pas encore de compte ?
-				<button
-					type="button"
-					class="text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 dark:hover:text-cyan-300 underline"
-					on:click={() => goto('/register')}
-				>
-					Créer un compte
-				</button>
-			</div>
-		</div>
+		{/if}
 	</div>
 </div>

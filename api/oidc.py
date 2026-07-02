@@ -31,7 +31,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 import models
 import team_access
-from auth import SECRET_KEY, ALGORITHM, create_access_token, get_user_by_email, get_password_hash
+from auth import (
+    SECRET_KEY,
+    ALGORITHM,
+    create_access_token,
+    get_user_by_email,
+    get_password_hash,
+    legacy_login_enabled,
+)
 from rate_limit import limiter
 
 
@@ -135,6 +142,7 @@ async def oidc_status() -> dict:
     return {
         "enabled": OIDC_ENABLED,
         "label": OIDC_BUTTON_LABEL if OIDC_ENABLED else None,
+        "legacy_login": legacy_login_enabled(),
     }
 
 
