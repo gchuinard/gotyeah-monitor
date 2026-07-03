@@ -34,14 +34,22 @@ from routers import admin
 from auth import router as auth_router
 from oidc import router as oidc_router
 
-app = FastAPI(redirect_slashes=False)
+_DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+app = FastAPI(
+    redirect_slashes=False,
+    # Doc interactive (Swagger /docs, ReDoc /redoc, /openapi.json) exposée uniquement
+    # en dev. En prod (DEBUG != true) elle est désactivée : on ne cartographie pas l'API.
+    docs_url="/docs" if _DEBUG else None,
+    redoc_url="/redoc" if _DEBUG else None,
+    openapi_url="/openapi.json" if _DEBUG else None,
+)
 
 # Rate limiting (anti brute-force / abus d'envoi d'emails) — voir auth.py pour les routes décorées.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-_DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 # Origine du front autorisée par le CORS (sinon "*" si non configuré, ex. dev local).
 _FRONTEND_ORIGIN = os.getenv("FRONTEND_URL", "").rstrip("/")
 
