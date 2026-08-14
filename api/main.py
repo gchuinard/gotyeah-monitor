@@ -33,6 +33,7 @@ from routers import api_tokens
 from routers import admin
 from auth import router as auth_router
 from oidc import router as oidc_router
+import mcp_bridge
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
@@ -580,3 +581,10 @@ app.include_router(public.manage_router)
 app.include_router(public.public_router)
 app.include_router(api_tokens.router)
 app.include_router(admin.router)
+
+# Pont de confiance /api/mcp/* pour le hub MCP central (gotyeah-mcp). Monté en
+# permanence : la garde est PAR REQUÊTE (secret partagé, default-deny) et non au
+# montage — une route absente selon l'env rendrait le diagnostic d'un 404 ambigu
+# (« pas déployé » ou « pas configuré ? »). Sans MONITOR_MCP_SHARED_SECRET, tout
+# renvoie 401.
+mcp_bridge.register(app)

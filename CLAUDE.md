@@ -143,6 +143,46 @@ Migrations to date: `0001-0004` (initial + email flows), `0005` (`users.token_ve
 
 `adapter-static` has no server, so SvelteKit can only emit CSP via a `<meta>` tag (`kit.csp` `mode: 'hash'` in `svelte.config.js`, which SHA-256-hashes its inline scripts). But scanners (ZAP/Sonar) only credit the **HTTP header** CSP, not the meta. So `front/inject-csp-hashes.js` runs in `Dockerfile.prod` **after `npm run build`**: it greps the `sha256-…` values out of `build/index.html` and substitutes the `__CSP_SCRIPT_HASHES__` placeholder in `nginx.conf` (`> nginx.conf.final`, COPY'd into the runtime stage) → a strict `script-src 'self' '<theme-hash>' '<bootstrap-hash>'` (**no `'unsafe-inline'`**) in the header, always in sync with the served HTML. The script **fails the build** if no hash is found, so a broken CSP never ships (the deploy health-gate then rolls back). Two inline scripts get hashed: the **anti-flash theme script** in `app.html` (stable content → its hash is **hardcoded in `svelte.config.js`** `script-src`; regenerate it if that `<script>` ever changes) and **SvelteKit's bootstrap** (hash **changes every build** → hence the build-time extraction; never hardcode it). `style-src` keeps `'unsafe-inline'` (Svelte injects runtime inline styles, which can't be hashed). Don't add a `script-src`/`default-src` in any *other* CSP layer (e.g. a second header): two policies intersect, and a layer lacking the per-build bootstrap hash would block it → white screen. NB: prod is behind **Cloudflare**, which passes CSP/COOP through but **rewrites** HSTS/X-Frame-Options/Referrer-Policy with its own values and **caches static files** (`/robots.txt`) without the origin's security headers — so some scanner findings on cached/static paths are CF-edge artifacts, not nginx bugs.
 
+### The MCP bridge (`api/mcp_bridge.py`) is the one non-JWT **write** surface
+
+`/api/mcp/*` serves the central MCP hub ([gotyeah-mcp](../gotyeah-mcp)), which is what exposes
+Monitor's tools to claude.ai. The hub authenticates the human against the IdP (Pocket ID), then
+calls these endpoints with `X-MCP-Secret` (shared secret) + `X-Act-As-Email` (the **verified**
+email). No OAuth is redone here. Symmetric to the bridge gotyeah-sonar and gotyeah-notes already
+expose — same header pair, same default-deny.
+
+- **Default-deny, per request**: `_require_bridge` compares `MONITOR_MCP_SHARED_SECRET` in
+  constant time (**on bytes** — `compare_digest` raises `TypeError` on non-ASCII `str`, which
+  would turn a forged latin-1 header into a 500 instead of a 401), then resolves the email to a
+  `User` via `auth.get_user_by_email`. Unset secret → every route 401s. `register(app)` is called
+  unconditionally in `main.py`: mounting routes that always 401 beats mounting them conditionally,
+  where a 404 can't distinguish "not deployed" from "not configured".
+- **Authorization is NOT re-implemented**: every handler goes through `team_access.require_team` /
+  `require_monitor` — `readonly` to read, `member` to write, exactly like the web UI. The bridge
+  widens *who can call*, never *what they may do*.
+- **This is the deliberate exception to "API tokens are read-only."** `gym_` tokens stay read-only
+  (see the auth section); this bridge creates/updates/deletes, which is its whole point. What
+  keeps that safe is the pair above: an IdP-**verified** identity, and unchanged team roles. Don't
+  relax either — and in particular, don't reuse this bridge's shared secret as a general API key.
+- **`update_monitor` is a PARTIAL patch, and must stay one.** `PUT /monitors/{id}` is a total
+  replacement — every field missing from the payload is overwritten. Handed to an agent as-is,
+  "rename this monitor" would silently wipe its keyword, latency threshold, interval and group.
+  So `_apply_patch` merges onto current state and revalidates through the **same**
+  `schemas.MonitorUpdate` as the UI (bounds, `keyword_mode`, "port required for type port" stay
+  defined in one place). Consequence: `None` can only mean "not provided", so blanking a nullable
+  field goes through the explicit `clear` list, bounded by `CLEARABLE_FIELDS`.
+- **`create_monitor` may infer `team_id`** only when the caller has exactly one writable, active
+  team (the common case: one personal team). With several, it 400s and lists them rather than
+  guessing — a monitor created in the wrong team is invisible to the people who needed it and
+  alerts the wrong ones.
+- No rate limit and no per-team cap: a caller can create as many monitors as the UI would let
+  them, and each one adds an outbound probe every `check_interval_seconds`. The anti-SSRF guard
+  still applies **at probe time, not at creation** — an internal URL is accepted and then never
+  probed (stays `unknown` forever, with a warning in the loop's log).
+- Config: `MONITOR_MCP_SHARED_SECRET` in `.env` (must equal `MONITOR_MCP_SECRET` hub-side). The
+  hub reaches the API over `monitor_net` (`http://monitor_api_prod:8000`) — it is **not** on the
+  NPM network.
+
 ## Deploy & CI
 
 - CI/CD lives in `.github/workflows/ci-cd.yml` (single file). Three jobs: `backend`, `frontend`, `deploy` (deploy only on push to `main`).
