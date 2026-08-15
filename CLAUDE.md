@@ -175,6 +175,15 @@ expose — same header pair, same default-deny.
   team (the common case: one personal team). With several, it 400s and lists them rather than
   guessing — a monitor created in the wrong team is invisible to the people who needed it and
   alerts the wrong ones.
+- **Groups: create/update/delete, but no `list_groups`.** `list_teams` already returns each
+  team's groups, and a `group_id` is only valid inside its monitor's team — two read paths for
+  the same data would drift. `update_group` only takes `name` (the sole editable field; moving a
+  group across teams isn't exposed, it would drag its monitors out of their owning team).
+  `delete_group` returns **`ungrouped_monitors` and `deleted_recipients`, counted before the
+  delete**: monitors survive ungrouped (FK `SET NULL`), but the group's `alert_recipients` are
+  CASCADE-deleted, so monitors that were alerting through that channel silently stop — and
+  nothing afterwards can tell you how many. `create_group` returns `duplicate_name` because
+  group names are **not** unique in DB: a retried create stacks a homonym instead of failing.
 - No rate limit and no per-team cap: a caller can create as many monitors as the UI would let
   them, and each one adds an outbound probe every `check_interval_seconds`. The anti-SSRF guard
   still applies **at probe time, not at creation** — an internal URL is accepted and then never

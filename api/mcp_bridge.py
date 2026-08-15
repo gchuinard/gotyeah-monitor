@@ -28,7 +28,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import Body, Depends, Header, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -395,6 +395,115 @@ async def _delete_monitor(
     return {"deleted": True, "monitor_id": monitor_id, "name": name}
 
 
+# --------------------------------------------------------------------------- #
+# Groupes. Pas de route de LISTE ici : `list_teams` rend déjà les groupes de chaque
+# équipe, et un group_id n'a de sens que dans l'équipe de son monitor — deux sources
+# pour la même donnée finiraient par diverger.
+# --------------------------------------------------------------------------- #
+async def _create_group(
+    name: str = Body(..., embed=True),
+    team_id: Optional[int] = Body(None, embed=True),
+    db: AsyncSession = Depends(get_db),
+    x_mcp_secret: Optional[str] = Header(None, alias="X-MCP-Secret"),
+    x_act_as_email: Optional[str] = Header(None, alias="X-Act-As-Email"),
+):
+    user = await _require_bridge(db, x_mcp_secret, x_act_as_email)
+    resolved_team = await _resolve_team_id(db, user, team_id)
+    await team_access.require_team(db, resolved_team, user, "member")
+    try:
+        payload = schemas.MonitorGroupCreate(name=name, team_id=resolved_team)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    # Les noms de groupes ne sont pas contraints uniques en base (et l'UI ne l'impose pas
+    # non plus) : on ne l'invente pas ici, mais on le SIGNALE, pour qu'un agent qui relance
+    # deux fois la même création s'aperçoive du doublon au lieu de l'empiler en silence.
+    dup = await db.execute(
+        select(func.count())
+        .select_from(models.MonitorGroup)
+        .where(
+            models.MonitorGroup.team_id == resolved_team,
+            models.MonitorGroup.name == payload.name,
+        )
+    )
+    group = models.MonitorGroup(
+        name=payload.name, team_id=resolved_team, user_id=user.id
+    )
+    db.add(group)
+    await db.commit()
+    await db.refresh(group)
+    return {
+        "id": group.id,
+        "name": group.name,
+        "team_id": group.team_id,
+        "created_at": group.created_at,
+        "duplicate_name": int(dup.scalar_one()) > 0,
+    }
+
+
+async def _update_group(
+    group_id: int = Body(..., embed=True),
+    name: str = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db),
+    x_mcp_secret: Optional[str] = Header(None, alias="X-MCP-Secret"),
+    x_act_as_email: Optional[str] = Header(None, alias="X-Act-As-Email"),
+):
+    user = await _require_bridge(db, x_mcp_secret, x_act_as_email)
+    group, _ = await team_access.require_group(db, group_id, user, "member")
+    try:
+        payload = schemas.MonitorGroupUpdate(name=name)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    # `name` est le SEUL champ modifiable d'un groupe (cf. MonitorGroupUpdate) : pas de
+    # fusion à faire ici, contrairement aux monitors. Changer d'équipe n'est pas exposé —
+    # ça déplacerait les monitors du groupe hors de leur équipe propriétaire.
+    group.name = payload.name
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+async def _delete_group(
+    group_id: int = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db),
+    x_mcp_secret: Optional[str] = Header(None, alias="X-MCP-Secret"),
+    x_act_as_email: Optional[str] = Header(None, alias="X-Act-As-Email"),
+):
+    user = await _require_bridge(db, x_mcp_secret, x_act_as_email)
+    group, _ = await team_access.require_group(db, group_id, user, "member")
+    name = group.name
+    # Comptés AVANT la suppression : après, plus personne ne peut savoir ce qui a bougé.
+    # Les monitors sont DÉGROUPÉS (FK SET NULL), pas supprimés ; les destinataires
+    # d'alerte du groupe, eux, partent en CASCADE — donc les monitors qui recevaient
+    # leurs alertes par ce canal ne les reçoivent plus.
+    ungrouped = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(models.Monitor)
+                .where(models.Monitor.group_id == group_id)
+            )
+        ).scalar_one()
+    )
+    recipients = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(models.AlertRecipient)
+                .where(models.AlertRecipient.group_id == group_id)
+            )
+        ).scalar_one()
+    )
+    await db.delete(group)
+    await db.commit()
+    return {
+        "deleted": True,
+        "group_id": group_id,
+        "name": name,
+        "ungrouped_monitors": ungrouped,
+        "deleted_recipients": recipients,
+    }
+
+
 def register(app) -> None:
     """Monte /api/mcp/* sur l'app. `add_api_route` produit des APIRoute normales (avec `.path`)
     — robuste à toutes les versions FastAPI, contrairement à include_router."""
@@ -422,3 +531,17 @@ def register(app) -> None:
         response_model=schemas.MonitorRead,
     )
     app.add_api_route("/api/mcp/delete_monitor", _delete_monitor, methods=["POST"])
+    # Groupes : la lecture passe par list_teams (source unique), d'où l'absence de list_groups.
+    app.add_api_route(
+        "/api/mcp/create_group",
+        _create_group,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    app.add_api_route(
+        "/api/mcp/update_group",
+        _update_group,
+        methods=["POST"],
+        response_model=schemas.MonitorGroupRead,
+    )
+    app.add_api_route("/api/mcp/delete_group", _delete_group, methods=["POST"])
