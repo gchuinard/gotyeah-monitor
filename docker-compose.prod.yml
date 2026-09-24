@@ -78,7 +78,10 @@ services:
     expose:
       - "3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
+      # $$ : c'est le shell du conteneur qui lit MYSQL_USER et MYSQL_PASSWORD au moment
+      # du test, compose n'y substitue rien. Le mot de passe n'apparaît donc plus en
+      # clair dans la définition du healthcheck (docker inspect).
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u \"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\""]
       interval: 10s
       timeout: 5s
       retries: 10
