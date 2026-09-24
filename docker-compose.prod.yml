@@ -45,7 +45,9 @@ services:
     expose:
       - "80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      # 127.0.0.1 et non localhost : dans le conteneur, localhost résout d'abord vers ::1
+      # alors que nginx n'écoute qu'en IPv4 ; le test échouait et bloquait tout déploiement.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
       interval: 30s
       timeout: 5s
       retries: 3
