@@ -164,11 +164,13 @@ FRONTEND_URL=https://votre-domaine.com
 
 ## CI/CD
 
-Le pipeline GitHub Actions (`.github/workflows/`) effectue à chaque push :
+Le pipeline GitHub Actions (`.github/workflows/ci-cd.yml`) tourne à chaque push sur `main` ou `dev` et sur les pull requests vers ces branches (la formule précédente, « à chaque push », était trop large : un push sur une autre branche ne déclenche rien) :
 
-1. **Backend** — installation des dépendances Python + compilation (`compileall`)
-2. **Frontend** — `npm ci`, lint ESLint/Prettier, `vite build`
+1. **Backend** — installation des dépendances Python + compilation (`compileall`, sous Python 3.14 : c'est une vérification de **syntaxe**, qui n'exécute rien ; l'image de prod tournant en 3.11, une syntaxe propre à 3.12+ passerait la CI)
+2. **Frontend** — `npm ci`, lint ESLint/Prettier, `vite build` (le type-check `npm run check` n'est pas lancé)
 3. **Deploy** (uniquement sur `main`) — SSH au Pi, `git pull`, `docker compose up --build`, **puis attente des healthchecks Docker avec rollback automatique** (retour au commit précédent) si l'API ou le front ne deviennent pas sains
+
+**Aucun test automatisé** : le dépôt ne contient aucune suite de tests, ni côté API ni côté front (constaté le 25/09/2026). Une CI verte garantit que les dépendances s'installent, que le Python est syntaxiquement valide, que le front passe le lint et se construit, rien de plus sur le comportement.
 
 ## Développement frontend seul
 

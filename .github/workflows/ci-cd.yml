@@ -1,5 +1,9 @@
 name: CI/CD GotYeah Monitor
 
+# Aucun test automatisé dans ce dépôt, ni API ni front (constaté le 25/09/2026) : cette CI
+# vérifie l'installation des dépendances, la syntaxe Python (compileall, qui n'exécute rien),
+# le lint et le build du front. Le jour où une suite de tests existe, l'ajouter ici.
+
 on:
   push:
     branches: [ main, dev ]

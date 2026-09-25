@@ -13,11 +13,11 @@ npm run check        # svelte-kit sync && svelte-check (type-check)
 npm run build        # vite build
 ```
 
-Local WSL note : `npm run check` and `npm run build` often fail with `EACCES` on `.svelte-kit/` (filesystem perms). `npm run lint` works and is what CI runs — rely on it. The CI runner is plain Linux so the build passes there.
+Local WSL note : `npm run check` and `npm run build` often fail with `EACCES` on `.svelte-kit/` (filesystem perms). `npm run lint` works and is what CI runs — rely on it. The CI runner is plain Linux so the build passes there (CI runs `npm run lint` then `npm run build`, never `npm run check`).
 
 ### Backend (`api/`)
 ```bash
-python -m compileall .                       # what CI runs to validate
+python -m compileall .                       # what CI runs: a syntax check only, nothing is executed
 python -m alembic upgrade head               # apply migrations
 python -m alembic revision --autogenerate -m "<msg>"   # new migration
 ```
@@ -195,6 +195,7 @@ expose — same header pair, same default-deny.
 ## Deploy & CI
 
 - CI/CD lives in `.github/workflows/ci-cd.yml` (single file). Three jobs: `backend`, `frontend`, `deploy` (deploy only on push to `main`).
+- **There are no automated tests** in this repo, neither API nor front (checked 2026-09-25). `backend` only installs deps and runs `compileall` under Python 3.14 (prod runs 3.11), `frontend` runs lint and build. A green CI says nothing about behaviour: don't claim a change is "tested by CI".
 - Deploy uses `appleboy/ssh-action` → SSH to Pi via `secrets.SSH_HOST/SSH_USER/SSH_KEY`. **`SSH_HOST` is the Pi's public IP — no DDNS configured**, so home IP changes break deploy with `dial tcp ***:22: i/o timeout`. Past fix: update the GH secret manually.
 - The deploy script is **health-gated with auto-rollback**: it records the current commit, `git pull`s, `up -d --build`, then waits for `monitor_api_prod` **and** `monitor_front_prod` to report Docker `healthy`. If either doesn't within the timeout, it `git reset --hard`s to the previous commit, rebuilds, and exits non-zero. So a build/migration that fails health checks reverts the code automatically (DB migrations are **not** rolled back — that's still a known gap).
 - `docker-compose.prod.yml` uses `monitor_net` as an `external: true` network. The reverse proxy (managed outside this repo) lives on that network. Creating the network is a one-time `docker network create monitor_net`.
