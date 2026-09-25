@@ -64,12 +64,17 @@ jobs:
     steps:
       # Sans empreinte, appleboy/ssh-action désactive la vérification de l'hôte
       # en silence : on refuse donc de déployer si le secret est vide.
-      - name: Vérifier que l'empreinte du Pi est configurée
+      - name: Vérifier que l'empreinte du Pi et la clé de déploiement sont configurées
         env:
           SSH_HOST_FINGERPRINT: ${{ secrets.SSH_HOST_FINGERPRINT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           if [ -z "$SSH_HOST_FINGERPRINT" ]; then
             echo "::error::Secret SSH_HOST_FINGERPRINT absent : sans lui, le déploiement accepterait n'importe quel hôte."
+            exit 1
+          fi
+          if [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::Secret DEPLOY_SSH_KEY absent."
             exit 1
           fi
 
@@ -78,53 +83,14 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          # Clé dédiée à Monitor depuis le 25/09/2026. Sur le Pi, authorized_keys la force sur
+          # « /usr/local/sbin/gotyeah-deploy monitor » : git pull de main puis deploy/pi-deploy.sh.
+          # Elle ne peut rien faire d'autre.
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           # Empreinte ECDSA du Pi (secret, jamais en clair dans ce dépôt public) :
           # un hôte qui présente une autre clé fait échouer la connexion (24/09).
           fingerprint: ${{ secrets.SSH_HOST_FINGERPRINT }}
-          script: |
-            set -e
-            cd /home/pi/sites/gotyeah-monitor
-
-            # Commit courant = cible de rollback si le déploiement échoue
-            PREV_SHA=$(git rev-parse HEAD)
-            echo "Commit actuel (cible de rollback) : $PREV_SHA"
-
-            git pull --ff-only
-
-            # Fonction (et non variable) : le shell par défaut du Pi est zsh, qui ne
-            # découpe pas une variable non quotée en mots ($CMD up -> "CMD complet" up).
-            compose() {
-              docker compose -f docker-compose.prod.yml --env-file .env "$@"
-            }
-
-            deploy() {
-              compose up -d --build --force-recreate
-            }
-
-            # Attend qu'un conteneur passe 'healthy' (s'appuie sur les healthchecks compose)
-            wait_healthy() {
-              # NB : pas de variable nommée 'status' — c'est une variable en lecture
-              # seule en zsh (alias de $?), l'assignation y échouerait.
-              cname="$1"; timeout=150; elapsed=0
-              while true; do
-                health=$(docker inspect --format '{{.State.Health.Status}}' "$cname" 2>/dev/null || echo absent)
-                [ "$health" = healthy ] && return 0
-                [ "$health" = absent ] && { echo "Conteneur $cname introuvable"; return 1; }
-                [ "$elapsed" -ge "$timeout" ] && { echo "$cname non healthy après ${timeout}s (état: $health)"; return 1; }
-                sleep 5; elapsed=$((elapsed + 5))
-              done
-            }
-
-            rollback() {
-              echo "::error::Déploiement KO → rollback vers $PREV_SHA"
-              git reset --hard "$PREV_SHA"
-              compose up -d --build --force-recreate
-              exit 1
-            }
-
-            deploy || rollback
-            wait_healthy monitor_api_prod || rollback
-            wait_healthy monitor_front_prod || rollback
-            echo "Déploiement OK : api + front healthy"
+          # Ignorée par le Pi (commande forcée) : les étapes, retour arrière compris,
+          # vivent dans deploy/pi-deploy.sh.
+          script: deploy
