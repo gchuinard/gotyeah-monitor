@@ -23,7 +23,10 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: "3.14"
+          # Même version que la production (image python:3.11-slim de api/Dockerfile.prod,
+          # 3.11.16 dans monitor_api_prod le 25/09/2026). Jusque-là la CI tournait en 3.14 :
+          # une syntaxe propre à 3.12 ou plus y passait, et n'aurait cassé qu'en production.
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
