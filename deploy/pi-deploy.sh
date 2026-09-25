@@ -1,13 +1,13 @@
 #!/bin/bash
 # Déploiement de Monitor sur le Pi. Ce script ne se lance pas à la main : il est
 # exécuté par /usr/local/sbin/gotyeah-deploy (commande forcée de la clé
-# DEPLOY_SSH_KEY dans authorized_keys), juste après le git pull de main, depuis
-# /home/pi/sites/gotyeah-monitor. Argument : le commit déployé avant celui-ci.
-# Modifier ce fichier suffit : le prochain déploiement lance la version de main.
-# Si l'API ou le front ne deviennent pas sains, retour au commit d'avant.
+# DEPLOY_SSH_KEY dans authorized_keys), depuis /home/pi/sites/gotyeah-monitor, après un git fetch.
+# Variables reçues : CIBLE (commit à déployer), AVANT (commit en place).
+# Le script est lu dans le commit CIBLE : le modifier sur main suffit.
+# Si l'API ou le front ne deviennent pas sains, retour au commit AVANT.
 set -uo pipefail
 
-avant=${1:?commit précédent attendu en argument}
+git merge --ff-only "$CIBLE" || exit 1
 
 compose() {
   docker compose -f docker-compose.prod.yml --env-file .env "$@"
@@ -27,8 +27,8 @@ wait_healthy() {
 }
 
 rollback() {
-  echo "::error::Déploiement KO, retour arrière vers $avant"
-  git reset --hard "$avant"
+  echo "::error::Déploiement KO, retour arrière vers $AVANT"
+  git reset --hard "$AVANT"
   compose up -d --build --force-recreate
   exit 1
 }
