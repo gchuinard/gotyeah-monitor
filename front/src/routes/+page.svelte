@@ -572,6 +572,9 @@
 	}
 	// Recharge la gestion quand le modal est ouvert et que l'équipe gérée change.
 	$: if (showTeams && $activeTeamId !== teamsLoadedFor) {
+		// Lue par la condition au prochain passage du bloc réactif, ce que la règle ne voit
+		// pas : elle lit le script comme du code linéaire, sans la réexécution de `$:`.
+		// eslint-disable-next-line no-useless-assignment
 		teamsLoadedFor = $activeTeamId;
 		void loadTeamManagement();
 	}
@@ -991,6 +994,8 @@
 		await Promise.all([fetchMonitors(), loadGroups(get(activeTeamId))]);
 	}
 	$: if (teamsReady && $activeTeamId !== lastTeamLoaded) {
+		// Même garde que teamsLoadedFor : relue au prochain passage du bloc réactif.
+		// eslint-disable-next-line no-useless-assignment
 		lastTeamLoaded = $activeTeamId;
 		reloadForActiveTeam();
 	}

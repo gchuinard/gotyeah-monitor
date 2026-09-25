@@ -8,7 +8,9 @@
 	/** Lié en sortie (bind:valid) : vrai uniquement si toutes les règles passent. */
 	export let valid = false;
 
-	let checks = { length: false, uppercase: false, number: false, symbol: false };
+	// Sans valeur initiale : le bloc réactif ci-dessous la calcule avant le premier rendu,
+	// une valeur posée ici serait écrasée sans jamais être lue (no-useless-assignment).
+	let checks: Record<'length' | 'uppercase' | 'number' | 'symbol', boolean>;
 
 	// Recalcule l'état des règles à chaque frappe et met `valid` à jour en conséquence.
 	$: {

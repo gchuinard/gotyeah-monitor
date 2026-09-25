@@ -3,6 +3,7 @@ import logging
 import os
 import ssl
 import socket
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse
@@ -37,7 +38,19 @@ import mcp_bridge
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Démarrage et arrêt de la boucle de monitoring. Starlette 1.0 a retiré on_event,
+    # que FastAPI ne garde plus qu'à titre déprécié : on passe par lifespan, avec la
+    # même séquence (on_startup avant la première requête, on_shutdown à l'arrêt).
+    await on_startup()
+    yield
+    await on_shutdown()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     redirect_slashes=False,
     # Doc interactive (Swagger /docs, ReDoc /redoc, /openapi.json) exposée uniquement
     # en dev. En prod (DEBUG != true) elle est désactivée : on ne cartographie pas l'API.
@@ -500,7 +513,7 @@ def _on_monitor_task_done(task: "asyncio.Task[None]") -> None:
     asyncio.get_running_loop().call_later(delay, _spawn_monitor_loop)
 
 
-@app.on_event("startup")
+# on_startup et on_shutdown sont appelées par lifespan, en tête de fichier.
 async def on_startup() -> None:
     await init_db()
     app.state.shutting_down = False
@@ -512,7 +525,6 @@ async def on_startup() -> None:
     app.state.monitor_task = task
 
 
-@app.on_event("shutdown")
 async def on_shutdown() -> None:
     app.state.shutting_down = True
     task = getattr(app.state, "monitor_task", None)
