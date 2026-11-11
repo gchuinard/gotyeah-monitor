@@ -113,9 +113,9 @@ LOOP_STALE_AFTER_SECONDS = CHECK_INTERVAL_SECONDS * 3
 HEARTBEAT_URL = os.getenv("HEARTBEAT_URL", "").strip()
 
 # Rafraîchissement de la date d'expiration SSL : elle ne change qu'au renouvellement, inutile
-# d'ouvrir une connexion TLS à chaque check. Après un échec de lecture, on réessaie plus tôt.
+# d'ouvrir une connexion TLS à chaque check. Un échec de lecture n'est pas mémorisé : on
+# réessaie au check suivant, comme avant.
 SSL_REFRESH_SECONDS = 6 * 3600
-SSL_RETRY_SECONDS = 3600
 
 logger = logging.getLogger("monitor")
 
@@ -123,7 +123,7 @@ logger = logging.getLogger("monitor")
 # défaut, ils faisaient attendre la résolution DNS de la garde anti-SSRF des autres monitors
 # du même tick, et cette attente gonflait leur latence mesurée.
 _ssl_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ssl-expiry")
-# {monitor_id: (url, instant monotone du dernier rafraîchissement)}. En mémoire : un
+# {monitor_id: (url, instant monotone de la dernière lecture RÉUSSIE)}. En mémoire : un
 # redémarrage de l'API force simplement un rafraîchissement au premier check.
 _ssl_refreshed_at: dict[int, tuple[str, float]] = {}
 
@@ -160,8 +160,8 @@ def _ssl_refresh_due(monitor: models.Monitor, now_mono: float, now: datetime) ->
     cached = _ssl_refreshed_at.get(monitor.id)
     if cached is None or cached[0] != monitor.url:
         return True
-    if monitor.ssl_expiry_at is None:
-        return now_mono - cached[1] >= SSL_RETRY_SECONDS
+    if monitor.ssl_expiry_at is None:  # dernière lecture en échec : on réessaie à chaque check
+        return True
     if ssl_alert_level_for(monitor.ssl_expiry_at, now) not in (None, monitor.ssl_alert_level):
         return True
     return now_mono - cached[1] >= SSL_REFRESH_SECONDS
@@ -245,7 +245,8 @@ async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> d
         now_mono = loop.time()
         if _ssl_refresh_due(monitor, now_mono, datetime.now(timezone.utc)):
             ssl_expiry = await check_ssl_expiry(monitor.url)
-            _ssl_refreshed_at[monitor.id] = (monitor.url, now_mono)
+            if ssl_expiry is not None:
+                _ssl_refreshed_at[monitor.id] = (monitor.url, now_mono)
         else:
             ssl_expiry = monitor.ssl_expiry_at  # pas de relecture : on garde la date connue
     else:

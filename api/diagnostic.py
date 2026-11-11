@@ -7,6 +7,7 @@ destinataires, ni emails, ni webhook, ni token, ni mot-clé.
 import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,23 @@ def _utc(dt: Optional[datetime]) -> Optional[datetime]:
 def _iso(dt: Optional[datetime]) -> str:
     dt = _utc(dt)
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else "—"
+
+
+def _safe_url(url: str) -> str:
+    """URL sans identifiants ni paramètres : une URL de monitor peut porter `user:pass@` ou
+    un `?token=`, et l'export est fait pour sortir de l'app."""
+    try:
+        p = urlsplit(url)
+        host = p.hostname or ""
+        if ":" in host:
+            host = f"[{host}]"
+        if p.port:
+            host = f"{host}:{p.port}"
+        masked = bool(p.username or p.password or p.query or p.fragment)
+        clean = urlunsplit((p.scheme, host, p.path, "", ""))
+        return clean + (" (identifiants/paramètres masqués)" if masked else "")
+    except ValueError:
+        return "(URL illisible)"
 
 
 def _p95(values: List[int]) -> int:
@@ -69,7 +87,7 @@ async def build_diagnostic(db: AsyncSession, monitor: models.Monitor, window: st
     lines = [
         f"# Diagnostic monitor : {monitor.name}",
         "",
-        f"- URL : {monitor.url}",
+        f"- URL : {_safe_url(monitor.url)}",
         f"- Type : {monitor.type}" + (f" (port {monitor.port})" if monitor.type == "port" and monitor.port else ""),
         f"- Intervalle : {interval} s" if interval else f"- Intervalle : {DEFAULT_INTERVAL_SECONDS} s (défaut)",
         f"- Seuil de latence : {monitor.latency_threshold_ms} ms"
@@ -95,8 +113,10 @@ async def build_diagnostic(db: AsyncSession, monitor: models.Monitor, window: st
 
     # Pics : au-dessus de 3× la médiane, ou du seuil s'il est défini.
     limits = []
-    if median:
-        limits.append(PEAK_FACTOR * median)
+    # Plancher à 1 ms : une médiane à 0 (connect TCP local tronqué par int()) reste un critère.
+    peak_base = max(median, 1) if median is not None else None
+    if peak_base is not None:
+        limits.append(PEAK_FACTOR * peak_base)
     if monitor.latency_threshold_ms is not None:
         limits.append(monitor.latency_threshold_ms)
     peak_limit = min(limits) if limits else None
@@ -106,8 +126,8 @@ async def build_diagnostic(db: AsyncSession, monitor: models.Monitor, window: st
         else []
     )
     criteria = []
-    if median:
-        criteria.append(f"> {PEAK_FACTOR}× la médiane ({round(PEAK_FACTOR * median)} ms)")
+    if peak_base is not None:
+        criteria.append(f"> {PEAK_FACTOR}× la médiane ({round(PEAK_FACTOR * peak_base)} ms)")
     if monitor.latency_threshold_ms is not None:
         criteria.append(f"> seuil ({monitor.latency_threshold_ms} ms)")
 
