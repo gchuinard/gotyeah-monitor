@@ -41,6 +41,13 @@ def _ssl_level(days_left: int) -> Optional[int]:
     return None
 
 
+def ssl_alert_level_for(expiry: datetime, now: datetime) -> Optional[int]:
+    """Palier SSL qu'impliquerait cette date d'expiration (même calcul qu'evaluate_alerts)."""
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    return _ssl_level((expiry - now).days)
+
+
 class _Alert:
     def __init__(self, monitor: "models.Monitor", kind: str, **data):
         self.monitor_name = monitor.name
