@@ -3,6 +3,7 @@ import logging
 import os
 import ssl
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -25,7 +26,7 @@ from database import AsyncSessionLocal, init_db
 import models
 from rate_limit import limiter
 from ssrf_guard import url_is_safe, host_is_safe
-from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD
+from notifications import evaluate_alerts, dispatch_alerts, ALERT_FAILURE_THRESHOLD, ssl_alert_level_for
 from routers import monitors
 from routers import groups
 from routers import teams
@@ -111,7 +112,20 @@ LOOP_STALE_AFTER_SECONDS = CHECK_INTERVAL_SECONDS * 3
 # C'est un réglage opérateur (variable d'env), pas une URL utilisateur -> pas de garde SSRF.
 HEARTBEAT_URL = os.getenv("HEARTBEAT_URL", "").strip()
 
+# Rafraîchissement de la date d'expiration SSL : elle ne change qu'au renouvellement, inutile
+# d'ouvrir une connexion TLS à chaque check. Un échec de lecture n'est pas mémorisé : on
+# réessaie au check suivant, comme avant.
+SSL_REFRESH_SECONDS = 6 * 3600
+
 logger = logging.getLogger("monitor")
+
+# Pool DÉDIÉ aux contrôles SSL (connexions TLS bloquantes, timeout 5 s). Dans le pool par
+# défaut, ils faisaient attendre la résolution DNS de la garde anti-SSRF des autres monitors
+# du même tick, et cette attente gonflait leur latence mesurée.
+_ssl_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ssl-expiry")
+# {monitor_id: (url, instant monotone de la dernière lecture RÉUSSIE)}. En mémoire : un
+# redémarrage de l'API force simplement un rafraîchissement au premier check.
+_ssl_refreshed_at: dict[int, tuple[str, float]] = {}
 
 
 def _fetch_ssl_expiry(hostname: str, port: int = 443) -> Optional[datetime]:
@@ -135,7 +149,22 @@ async def check_ssl_expiry(url: str) -> Optional[datetime]:
     if not hostname:
         return None
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _fetch_ssl_expiry, hostname, port)
+    return await loop.run_in_executor(_ssl_executor, _fetch_ssl_expiry, hostname, port)
+
+
+def _ssl_refresh_due(monitor: models.Monitor, now_mono: float, now: datetime) -> bool:
+    """True s'il faut relire le certificat à ce check. Toujours vrai quand la date stockée
+    ferait partir une alerte SSL (nouveau palier) : on confirme sur le certificat réel avant
+    d'alerter, sinon un certificat renouvelé entre deux lectures déclencherait une fausse
+    alerte (Let's Encrypt renouvelle justement à J-30, l'un des paliers)."""
+    cached = _ssl_refreshed_at.get(monitor.id)
+    if cached is None or cached[0] != monitor.url:
+        return True
+    if monitor.ssl_expiry_at is None:  # dernière lecture en échec : on réessaie à chaque check
+        return True
+    if ssl_alert_level_for(monitor.ssl_expiry_at, now) not in (None, monitor.ssl_alert_level):
+        return True
+    return now_mono - cached[1] >= SSL_REFRESH_SECONDS
 
 
 async def probe_port(host: str, port: int, timeout: float = 10.0) -> bool:
@@ -156,8 +185,12 @@ async def probe_port(host: str, port: int, timeout: float = 10.0) -> bool:
 
 async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> dict:
     """Effectue le check réseau SANS toucher la session (sûr à lancer en parallèle).
-    Renvoie le résultat ; l'application en base se fait séquentiellement ensuite."""
-    start = asyncio.get_event_loop().time()
+    Renvoie le résultat ; l'application en base se fait séquentiellement ensuite.
+
+    La latence ne couvre que la requête (connect TCP, ou GET HTTP) : le chrono démarre APRÈS
+    la garde anti-SSRF, dont la résolution DNS passe par un pool de threads partagé et
+    mesurait surtout la charge du tick."""
+    loop = asyncio.get_event_loop()
     status_code: int | None = None
     latency_ms: int | None = None
     new_status = "down"
@@ -172,8 +205,9 @@ async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> d
         else:  # ping : joignabilité du host sur le port de l'URL (ou 443/80)
             port = parsed.port or (443 if parsed.scheme == "https" else 80)
         if host and port and await host_is_safe(host, port):
+            start = loop.time()
             ok = await probe_port(host, port)
-            latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
+            latency_ms = int((loop.time() - start) * 1000)
             new_status = "up" if ok else "down"
         elif not (host and port):
             logger.warning("Monitor %s ignoré : host/port manquant", monitor.id)
@@ -184,6 +218,7 @@ async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> d
     # --- Type http : GET (+ check de contenu optionnel) ---
     if await url_is_safe(monitor.url):
         need_body = bool(monitor.keyword)
+        start = loop.time()
         try:
             # Sans mot-clé : on ne lit PAS le corps (stream) — seul le code compte,
             # ce qui évite de charger une réponse énorme (anti-OOM). Avec mot-clé :
@@ -202,12 +237,18 @@ async def probe_monitor(monitor: models.Monitor, client: httpx.AsyncClient) -> d
                     text = b"".join(chunks)[:MAX_BODY_BYTES].decode("utf-8", errors="ignore")
                     found = monitor.keyword in text
                     body_ok = found if monitor.keyword_mode == "present" else (not found)
-            latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
+            latency_ms = int((loop.time() - start) * 1000)
             code_ok = status_code == monitor.expected_status_code
             new_status = "up" if (code_ok and body_ok) else "down"
         except Exception:
             pass
-        ssl_expiry = await check_ssl_expiry(monitor.url)
+        now_mono = loop.time()
+        if _ssl_refresh_due(monitor, now_mono, datetime.now(timezone.utc)):
+            ssl_expiry = await check_ssl_expiry(monitor.url)
+            if ssl_expiry is not None:
+                _ssl_refreshed_at[monitor.id] = (monitor.url, now_mono)
+        else:
+            ssl_expiry = monitor.ssl_expiry_at  # pas de relecture : on garde la date connue
     else:
         # URL pointant vers une cible interne/non autorisée : on ne la sonde pas (anti-SSRF).
         logger.warning(
@@ -534,6 +575,7 @@ async def on_shutdown() -> None:
             await task
         except asyncio.CancelledError:
             pass
+    _ssl_executor.shutdown(wait=False, cancel_futures=True)
 
 
 # CORS restreint à l'origine du front (Bearer tokens, pas de cookies -> credentials off).

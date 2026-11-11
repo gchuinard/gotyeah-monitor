@@ -15,6 +15,7 @@
 	import type { MonitorCardData } from '$lib/stores/monitors';
 	import RecipientsEditor from '$lib/components/RecipientsEditor.svelte';
 	import { activeRole } from '$lib/stores/teams';
+	import { monitorWindowStore } from '$lib/stores/historyWindow';
 
 	export let monitor: MonitorCardData;
 	export let onClose: () => void;
@@ -23,6 +24,39 @@
 	$: readonly = $activeRole === 'readonly';
 
 	let mode = 1;
+
+	// ── Copier pour diagnostic ──────────────────────────────────────────────
+	// L'API ne propose que 24h et 7d : la fenêtre affichée par le StatusBar est arrondie
+	// au-dessus (au-delà d'un jour -> 7 jours).
+	$: windowHours = monitorWindowStore(monitor.id);
+	$: diagnosticWindow = $windowHours <= 24 ? '24h' : '7d';
+	let diagnosticMsg = '';
+	let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+
+	async function fetchDiagnostic(): Promise<string> {
+		const res = await apiFetch(`/monitors/${monitor.id}/diagnostic?window=${diagnosticWindow}`);
+		if (!res.ok) throw new Error(String(res.status));
+		return res.text();
+	}
+
+	/** Copie l'export Markdown dans le presse-papiers. ClipboardItem prend une promesse :
+	 * Safari refuse sinon une écriture qui suit un appel réseau (geste utilisateur consommé). */
+	async function copyDiagnostic() {
+		clearTimeout(diagnosticTimer);
+		diagnosticMsg = 'Préparation...';
+		try {
+			if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+				const blob = fetchDiagnostic().then((t) => new Blob([t], { type: 'text/plain' }));
+				await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+			} else {
+				await navigator.clipboard.writeText(await fetchDiagnostic());
+			}
+			diagnosticMsg = `Copié (${diagnosticWindow === '24h' ? '24 h' : '7 jours'})`;
+		} catch {
+			diagnosticMsg = 'Échec de la copie';
+		}
+		diagnosticTimer = setTimeout(() => (diagnosticMsg = ''), 3000);
+	}
 	let deleting = false;
 	let showConfirmDelete = false;
 	let deleteConfirmText = '';
@@ -557,6 +591,19 @@
 			<!-- Barre d'historique (pleine largeur) -->
 			<div class="px-6">
 				<StatusBar history={monitor.history} monitorId={monitor.id} />
+				<div class="mt-2 flex items-center justify-end gap-2">
+					{#if diagnosticMsg}
+						<span class="text-xs text-slate-400" role="status">{diagnosticMsg}</span>
+					{/if}
+					<button
+						type="button"
+						class="btn btn-sm btn-secondary"
+						on:click={copyDiagnostic}
+						title="Copie l'historique en Markdown, à coller dans un ticket ou à un assistant"
+					>
+						Copier pour diagnostic
+					</button>
+				</div>
 			</div>
 
 			<!-- Corps : 2 colonnes responsive -->

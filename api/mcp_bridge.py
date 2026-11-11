@@ -28,6 +28,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import Body, Depends, Header, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +36,7 @@ from database import get_db
 import models
 import schemas
 import team_access
+from diagnostic import build_diagnostic
 from auth import get_user_by_email
 from routers.monitors import _attach_maintenance, _attach_uptime, _validate_group
 
@@ -253,6 +255,19 @@ async def _get_monitor(
     await _attach_uptime(db, [monitor])
     await _attach_maintenance(db, [monitor])
     return monitor
+
+
+async def _get_monitor_diagnostic(
+    monitor_id: int = Query(...),
+    window: str = Query("24h", pattern="^(24h|7d)$"),
+    db: AsyncSession = Depends(get_db),
+    x_mcp_secret: Optional[str] = Header(None, alias="X-MCP-Secret"),
+    x_act_as_email: Optional[str] = Header(None, alias="X-Act-As-Email"),
+):
+    user = await _require_bridge(db, x_mcp_secret, x_act_as_email)
+    monitor, _ = await team_access.require_monitor(db, monitor_id, user, "readonly")
+    text = await build_diagnostic(db, monitor, window)
+    return PlainTextResponse(text, media_type="text/markdown; charset=utf-8")
 
 
 async def _create_monitor(
@@ -516,6 +531,12 @@ def register(app) -> None:
     )
     app.add_api_route(
         "/api/mcp/get_monitor", _get_monitor, methods=["GET"], response_model=schemas.MonitorRead
+    )
+    app.add_api_route(
+        "/api/mcp/get_monitor_diagnostic",
+        _get_monitor_diagnostic,
+        methods=["GET"],
+        response_class=PlainTextResponse,
     )
     app.add_api_route(
         "/api/mcp/create_monitor",

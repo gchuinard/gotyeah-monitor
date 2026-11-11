@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,7 @@ from database import get_db
 import models
 import schemas
 import team_access
+from diagnostic import build_diagnostic
 from auth import get_current_user, get_user_flexible
 
 router = APIRouter(prefix="/monitors", tags=["monitors"])
@@ -251,6 +253,19 @@ async def get_monitor_incidents(
         .limit(50)
     )
     return list(result.scalars().all())
+
+
+@router.get("/{monitor_id}/diagnostic", response_class=PlainTextResponse)
+async def get_monitor_diagnostic(
+    monitor_id: int,
+    window: str = Query("24h", pattern="^(24h|7d)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_user_flexible),
+) -> PlainTextResponse:
+    """Historique du monitor en Markdown, à coller dans un ticket ou à un assistant."""
+    monitor, _ = await team_access.require_monitor(db, monitor_id, current_user, "readonly")
+    text = await build_diagnostic(db, monitor, window)
+    return PlainTextResponse(text, media_type="text/markdown; charset=utf-8")
 
 
 @router.get("/{monitor_id}/sla", response_model=List[schemas.SlaMonth])
